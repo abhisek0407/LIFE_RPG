@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import dns from "node:dns";
+import http from "node:http";
 import cookieParser from "cookie-parser";
 import { connectDB } from "./config/db.js";
 
@@ -14,6 +15,7 @@ import streakRoutes from "./routes/streakRoutes.js";
 import activityLogRoutes from "./routes/activityLogRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import { protect } from "./middleware/authMiddleware.js";
+import { attachSarvamSttProxy } from "./services/sarvamSttProxy.js";
 
 
 dns.setServers(["8.8.8.8", "8.8.4.4"]);
@@ -49,6 +51,7 @@ app.use(cors({
   },
   credentials: true,
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -86,6 +89,12 @@ app.use((err, req, res, next) => {
 
 
 
-app.listen(PORT, () => {
+const server = http.createServer(app);
+
+// Sarvam AI realtime STT — browser connects to ws(s)://<host>/ws/stt?token=<jwt>
+attachSarvamSttProxy(server);
+
+server.listen(PORT, () => {
   console.log(`⚡ Server running on http://localhost:${PORT}`);
+  console.log(`🎙️  Voice STT proxy listening on ws://localhost:${PORT}/ws/stt`);
 });

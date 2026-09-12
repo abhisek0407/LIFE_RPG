@@ -1,9 +1,3 @@
-// Pure-logic AI endpoints — no DB writes.
-// Tries Gemini first (needs GEMINI_API_KEY in .env); falls back to a
-// deterministic rule-based version if the key is missing, the request
-// fails, or Gemini's response doesn't parse into the expected shape.
-// Every response includes `source` so callers know which path ran.
-
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 async function callGeminiJSON(prompt) {
@@ -62,6 +56,28 @@ Respond with ONLY valid JSON, no markdown fences, no commentary, in exactly this
 {"microtasks": [{"title": "string", "xpReward": number, "goldReward": number}]}`;
 }
 
+function buildVoiceDecomposePrompt(transcript, motivation) {
+    return `You are the task-decomposition engine for a gamified productivity app called Life RPG.
+A user just SPOKE the following task out loud (it may be in any language, including Hindi, Odia, or any other Indian or global language, and may contain speech-to-text noise):
+
+Transcript: "${transcript}"
+
+Motivation level: ${motivation}
+
+Do THREE things:
+1. Write a short, clean, human-readable task title in the SAME language style the user would expect to read (did not translate to natural English if the transcript is in another language), suitable for a "Task Name" field.
+2. Classify which single domain this task belongs to: "health" (vitality, physical workout, nutrition, hydration, sleep), "mental" (focus, studying, problem solving, mindfulness, emotional clarity), or "skill" (creative craft, coding, professional mastery, social confidence, reading).
+3. Break the task into 4 to 6 concrete, actionable microtasks, same rules as normal decomposition:
+   - Each microtask must be a single, concrete, completable action — not vague.
+   - If motivation is "low", make each microtask smaller and easier, with a slightly higher per-step xpReward (20-35) to build momentum.
+   - If motivation is "medium", use moderate step sizes with xpReward around 15-30 per step.
+   - If motivation is "high", fewer/larger steps are fine, with xpReward around 10-25 per step.
+   - goldReward should generally be 20-40% of xpReward, and can be 0.
+
+Respond with ONLY valid JSON, no markdown fences, no commentary, in exactly this shape:
+{"title": "string", "domain": "health|mental|skill", "microtasks": [{"title": "string", "xpReward": number, "goldReward": number}]}`;
+}
+
 function buildFeelStuckPrompt(domain) {
     return `You are the "I feel stuck" support feature for a gamified productivity app called Life RPG.
 A user has indicated they feel stuck or unmotivated${domain ? ` while working on something in the "${domain}" domain` : ""}.
@@ -97,6 +113,16 @@ function normalizeDecomposition(parsed) {
         totalXp: cleaned.reduce((sum, mt) => sum + mt.xpReward, 0),
         totalGold: cleaned.reduce((sum, mt) => sum + mt.goldReward, 0),
     };
+}
+
+function normalizeVoiceDecomposition(parsed, fallbackTranscript) {
+    const { microtasks, totalXp, totalGold } = normalizeDecomposition(parsed);
+
+    const domain = ["health", "mental", "skill"].includes(parsed?.domain) ? parsed.domain : "mental";
+    const title =
+        typeof parsed?.title === "string" && parsed.title.trim() ? parsed.title.trim() : fallbackTranscript;
+
+    return { title, domain, microtasks, totalXp, totalGold };
 }
 
 function normalizeFeelStuck(parsed) {
@@ -179,6 +205,18 @@ function decomposeWithRules(description, domain, motivation) {
     };
 }
 
+// Best-effort, English-keyword-only domain guess for the rare case Gemini is
+// down when a voice quest comes in. Non-English transcripts will just fall
+// back to "mental" — acceptable since this only fires when the AI path fails.
+function guessDomainFromText(text) {
+    const lower = (text || "").toLowerCase();
+    const healthKeywords = ["water", "sleep", "cook", "meal", "clean", "room", "workout", "gym", "run", "walk", "exercise", "yoga", "stretch"];
+    const skillKeywords = ["code", "coding", "build", "design", "art", "resume", "job", "write", "draw", "paint", "guitar", "portfolio"];
+    if (healthKeywords.some((kw) => lower.includes(kw))) return "health";
+    if (skillKeywords.some((kw) => lower.includes(kw))) return "skill";
+    return "mental";
+}
+
 function feelStuckFallback(domain) {
     const activeDomain = ["health", "mental", "skill"].includes(domain) ? domain : "mental";
     return {
@@ -238,6 +276,45 @@ export async function decomposeTask(req, res) {
     } catch (err) {
         console.error("decomposeTask error:", err);
         return res.status(500).json({ error: "Failed to decompose task" });
+    }
+}
+
+// ── POST /api/ai/voice-decompose ────────────────────────────────
+// body: { transcript, motivationLevel? }
+// Used by the voice (Sarvam STT) flow: the user never picked a domain, so
+// this endpoint asks Gemini to classify the domain AND decompose in one call.
+export async function voiceDecomposeTask(req, res) {
+    try {
+        const { transcript, motivationLevel } = req.body;
+
+        if (!transcript?.trim()) {
+            return res.status(400).json({ error: "transcript is required" });
+        }
+        const motivation = ["low", "medium", "high"].includes(motivationLevel) ? motivationLevel : "medium";
+        const trimmedTranscript = transcript.trim();
+
+        let result;
+        let source;
+        try {
+            const raw = await callGeminiJSON(buildVoiceDecomposePrompt(trimmedTranscript, motivation));
+            result = normalizeVoiceDecomposition(raw, trimmedTranscript);
+            source = "gemini";
+        } catch (err) {
+            console.warn("Gemini voice-decompose unavailable, using rule-based fallback:", err.message);
+            const domain = guessDomainFromText(trimmedTranscript);
+            const decomposed = decomposeWithRules(trimmedTranscript, domain, motivation);
+            result = { title: trimmedTranscript, domain, ...decomposed };
+            source = "rule-based";
+        }
+
+        return res.status(200).json({
+            motivationLevel: motivation,
+            source,
+            ...result,
+        });
+    } catch (err) {
+        console.error("voiceDecomposeTask error:", err);
+        return res.status(500).json({ error: "Failed to decompose voice quest" });
     }
 }
 

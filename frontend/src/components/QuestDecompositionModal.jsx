@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  X, 
-  Sparkles, 
-  Brain, 
-  HeartPulse, 
-  Plus, 
-  Trash2, 
-  ArrowRight, 
-  CheckCircle2, 
+import {
+  X,
+  Sparkles,
+  Brain,
+  HeartPulse,
+  Plus,
+  Trash2,
+  ArrowRight,
+  CheckCircle2,
   Layers,
   Cpu,
   Target,
@@ -21,6 +21,7 @@ export default function QuestDecompositionModal({
   isOpen,
   onClose,
   initialTask,
+  voiceResult,
   onSaveQuest
 }) {
   const [taskName, setTaskName] = useState('');
@@ -36,25 +37,47 @@ export default function QuestDecompositionModal({
   const [newCustomTaskText, setNewCustomTaskText] = useState('');
 
   useEffect(() => {
-    if (isOpen) {
-      setTaskName(initialTask || '');
-      setIsGenerated(false);
-      setIsGenerating(false);
-      setAnalysisPhase('');
-      setAiAnalysis(null);
-      setMicrotasks([]);
-      setNewCustomTaskText('');
-      
-      const lower = (initialTask || '').toLowerCase();
-      if (lower.includes('water') || lower.includes('sleep') || lower.includes('cook') || lower.includes('clean') || lower.includes('room') || lower.includes('workout') || lower.includes('gym') || lower.includes('run') || lower.includes('walk')) {
-        setDomain('health');
-      } else if (lower.includes('code') || lower.includes('build') || lower.includes('design') || lower.includes('art') || lower.includes('resume') || lower.includes('job') || lower.includes('write')) {
-        setDomain('skill');
-      } else {
-        setDomain('mental');
-      }
+    if (!isOpen) return;
+
+    setIsGenerating(false);
+    setAnalysisPhase('');
+    setNewCustomTaskText('');
+
+    // Voice quests arrive already decomposed by Gemini (title + domain +
+    // microtasks in one shot) — land straight on the "decomposed" screen
+    // instead of making the user click Regenerate.
+    if (voiceResult) {
+      setTaskName(voiceResult.title || '');
+      setDomain(['health', 'mental', 'skill'].includes(voiceResult.domain) ? voiceResult.domain : 'mental');
+      setMotivationLevel(voiceResult.motivationLevel || 'medium');
+      setAiAnalysis(voiceResult.analysis || null);
+      setMicrotasks(
+        (voiceResult.microtasks || []).map((mt, idx) => ({
+          id: mt.id || `mt_voice_${Date.now()}_${idx}`,
+          order: idx + 1,
+          isCompleted: false,
+          completedAt: null,
+          ...mt,
+        }))
+      );
+      setIsGenerated(true);
+      return;
     }
-  }, [isOpen, initialTask]);
+
+    setTaskName(initialTask || '');
+    setIsGenerated(false);
+    setAiAnalysis(null);
+    setMicrotasks([]);
+
+    const lower = (initialTask || '').toLowerCase();
+    if (lower.includes('water') || lower.includes('sleep') || lower.includes('cook') || lower.includes('clean') || lower.includes('room') || lower.includes('workout') || lower.includes('gym') || lower.includes('run') || lower.includes('walk')) {
+      setDomain('health');
+    } else if (lower.includes('code') || lower.includes('build') || lower.includes('design') || lower.includes('art') || lower.includes('resume') || lower.includes('job') || lower.includes('write')) {
+      setDomain('skill');
+    } else {
+      setDomain('mental');
+    }
+  }, [isOpen, initialTask, voiceResult]);
 
   if (!isOpen) return null;
 
@@ -177,7 +200,7 @@ export default function QuestDecompositionModal({
           </button>
         </div>
         <div className="overflow-y-auto py-5 space-y-5 pr-1 flex-1">
-          
+
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
               Task Name (Parsed by AI)
@@ -207,11 +230,10 @@ export default function QuestDecompositionModal({
                       soundService.playClick();
                       setDomain(key);
                     }}
-                    className={`p-3 rounded-xl border text-left transition-all ${
-                      isSelected
+                    className={`p-3 rounded-xl border text-left transition-all ${isSelected
                         ? 'border-cyan-500 dark:border-cyan-400 bg-cyan-50 dark:bg-cyan-500/15 shadow-sm dark:shadow-glow-mental'
                         : 'border-slate-200 dark:border-rpg-border bg-slate-50 dark:bg-rpg-card hover:bg-slate-100 dark:hover:bg-rpg-cardHover'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <Icon className="w-4 h-4" style={{ color: item.color }} />
@@ -228,8 +250,8 @@ export default function QuestDecompositionModal({
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            
-           
+
+
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                 Difficulty
@@ -243,11 +265,10 @@ export default function QuestDecompositionModal({
                       soundService.playClick();
                       setDifficulty(key);
                     }}
-                    className={`py-2 px-2 rounded-lg text-xs font-semibold border text-center transition-all ${
-                      difficulty === key
+                    className={`py-2 px-2 rounded-lg text-xs font-semibold border text-center transition-all ${difficulty === key
                         ? 'bg-cyan-500/15 dark:bg-slate-800 text-cyan-700 dark:text-cyan-300 border-cyan-500 dark:border-cyan-400'
                         : 'bg-slate-50 dark:bg-rpg-card text-slate-600 dark:text-slate-400 border-slate-200 dark:border-rpg-border hover:text-slate-900 dark:hover:text-slate-200'
-                    }`}
+                      }`}
                   >
                     <div>{diff.label}</div>
                     <div className="text-[10px] text-slate-400 font-mono mt-0.5">+{diff.xp}XP</div>
@@ -256,7 +277,7 @@ export default function QuestDecompositionModal({
               </div>
             </div>
 
-        
+
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                 Motivation Level
@@ -270,11 +291,10 @@ export default function QuestDecompositionModal({
                       soundService.playClick();
                       setMotivationLevel(key);
                     }}
-                    className={`py-2 px-2 rounded-lg text-xs font-semibold border text-center transition-all ${
-                      motivationLevel === key
+                    className={`py-2 px-2 rounded-lg text-xs font-semibold border text-center transition-all ${motivationLevel === key
                         ? 'bg-amber-500/15 dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-500 dark:border-amber-400'
                         : 'bg-slate-50 dark:bg-rpg-card text-slate-600 dark:text-slate-400 border-slate-200 dark:border-rpg-border hover:text-slate-900 dark:hover:text-slate-200'
-                    }`}
+                      }`}
                   >
                     <div>{motiv.emoji} {motiv.label.split('/')[0]}</div>
                   </button>

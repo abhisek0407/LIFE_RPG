@@ -1,13 +1,74 @@
-import React, { useState } from 'react';
-import { Search, Sparkles, AlertCircle, Zap, ArrowRight } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Search, Sparkles, AlertCircle, Zap, ArrowRight, Mic, Square, Loader2 } from 'lucide-react';
 import { soundService } from '../services/soundService';
+import { VoiceRecorder } from '../services/voiceService';
 
-export default function OverwhelmedHero({ 
-  username, 
-  onTriggerDecompose, 
-  onTriggerFeelStuck 
+export default function OverwhelmedHero({
+  username,
+  onTriggerDecompose,
+  onTriggerFeelStuck,
+  onVoiceQuest,
 }) {
   const [taskInput, setTaskInput] = useState('');
+
+  // 'idle' | 'connecting' | 'listening' | 'processing' | 'error'
+  const [voiceState, setVoiceState] = useState('idle');
+  const [voiceError, setVoiceError] = useState('');
+  const recorderRef = useRef(null);
+
+  useEffect(() => {
+    return () => recorderRef.current?.stop(); // stop mic + socket if the component unmounts mid-recording
+  }, []);
+
+  const startVoiceInput = async () => {
+    soundService.playClick();
+    setVoiceError('');
+    setTaskInput('');
+
+    const recorder = new VoiceRecorder({
+      onStateChange: (state) => setVoiceState(state),
+      onPartialTranscript: (text) => setTaskInput(text),
+      onFinalTranscript: async (text) => {
+        setTaskInput('');
+        if (!text.trim()) {
+          setVoiceState('idle');
+          return;
+        }
+        setVoiceState('processing');
+        try {
+          await onVoiceQuest?.(text.trim());
+        } catch (err) {
+          console.error('[Voice] Failed to build quest from transcript:', err);
+          setVoiceError('Something went wrong building your quest from that. Please try again.');
+        } finally {
+          setVoiceState('idle'); // always release the mic button, success or failure
+        }
+      },
+      onError: (message) => {
+        setVoiceError(message);
+        setVoiceState('idle'); // never leave the button stuck on a non-fatal error either
+      },
+    });
+
+    recorderRef.current = recorder;
+    await recorder.start();
+  };
+
+  const stopVoiceInput = () => {
+    soundService.playClick();
+    recorderRef.current?.stop();
+    setVoiceState('idle');
+  };
+
+  const handleMicClick = () => {
+    if (voiceState === 'idle' || voiceState === 'error') {
+      startVoiceInput();
+    } else if (voiceState === 'listening') {
+      stopVoiceInput();
+    }
+  };
+
+  const isVoiceBusy = voiceState === 'connecting' || voiceState === 'processing';
 
   const suggestedTasks = [
     { text: 'Study 3 chapters of Distributed Systems', domain: 'mental' },
@@ -27,7 +88,7 @@ export default function OverwhelmedHero({
   const handleSuggestionClick = (text) => {
     soundService.playClick();
     onTriggerDecompose(text);
-   
+
   };
 
   return (
@@ -60,6 +121,33 @@ export default function OverwhelmedHero({
             placeholder="e.g. Study 3 chapters for my exam, or Clean the whole house..."
             className="w-full py-4 px-3.5 sm:px-4 bg-transparent text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm sm:text-base focus:outline-none"
           />
+          <div className="pr-1.5 sm:pr-2">
+            <button
+              type="button"
+              onClick={handleMicClick}
+              disabled={isVoiceBusy}
+              title={
+                voiceState === 'listening'
+                  ? 'Stop recording'
+                  : 'Speak your task (any language)'
+              }
+              className={`btn-tactile relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center transition-all disabled:opacity-60 disabled:pointer-events-none ${voiceState === 'listening'
+                ? 'bg-red-500 text-white shadow-glow-gold'
+                : 'bg-slate-100 dark:bg-rpg-card text-slate-600 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-cyan-300 border border-slate-200 dark:border-rpg-border'
+                }`}
+            >
+              {voiceState === 'listening' && (
+                <span className="absolute inset-0 rounded-xl bg-red-500/40 animate-ping" />
+              )}
+              {isVoiceBusy ? (
+                <Loader2 className="w-5 h-5 animate-spin relative" />
+              ) : voiceState === 'listening' ? (
+                <Square className="w-4 h-4 relative fill-current" />
+              ) : (
+                <Mic className="w-5 h-5 relative" />
+              )}
+            </button>
+          </div>
           <div className="pr-2 sm:pr-3">
             <button
               type="submit"
@@ -71,6 +159,16 @@ export default function OverwhelmedHero({
             </button>
           </div>
         </div>
+        {(voiceState === 'listening' || voiceState === 'connecting' || voiceState === 'processing') && (
+          <p className="mt-2 text-xs sm:text-sm text-cyan-600 dark:text-cyan-400 font-medium animate-pulse">
+            {voiceState === 'connecting' && 'Connecting to voice engine…'}
+            {voiceState === 'listening' && '🎙️ Listening — speak your task in any language…'}
+            {voiceState === 'processing' && 'Got it — asking the AI to build your quest…'}
+          </p>
+        )}
+        {voiceError && (
+          <p className="mt-2 text-xs sm:text-sm text-red-500 dark:text-red-400 font-medium">{voiceError}</p>
+        )}
       </form>
       <div className="flex items-center justify-center gap-3 mb-6">
         <button
