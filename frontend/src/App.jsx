@@ -107,31 +107,30 @@ export default function App() {
     }
   });
 
- useEffect(() => {
-  if (!user) return;
+  useEffect(() => {
+    if (!user) return;
 
-  async function loadData() {
-    try {
-      const [questsData, dailiesData, storeData] =
-        await Promise.all([
+    async function loadData() {
+      try {
+        const [questsData, dailiesData, storeData] = await Promise.all([
           apiService.getQuests(),
           apiService.getDailies(),
-          apiService.getStoreItems()
+          apiService.getStoreItems(),
         ]);
 
-      if (questsData) setQuests(questsData);
-      if (dailiesData) setDailies(dailiesData);
-      if (storeData) setStoreItems(storeData);
-    } catch (err) {
-      console.warn(
-        "Backend unavailable, running on local persistent state",
-        err
-      );
+        if (questsData) setQuests(questsData);
+        if (dailiesData) setDailies(dailiesData);
+        if (storeData) setStoreItems(storeData);
+      } catch (err) {
+        console.warn(
+          "Backend unavailable, running on local persistent state",
+          err,
+        );
+      }
     }
-  }
 
-  loadData();
-}, [user]);
+    loadData();
+  }, [user]);
   useEffect(() => {
     const scheduleMidnightReset = () => {
       const now = new Date();
@@ -391,7 +390,7 @@ export default function App() {
         />
       );
     }
-
+         
     if (authPage === "reset-password") {
       return (
         <ResetPasswordPage
