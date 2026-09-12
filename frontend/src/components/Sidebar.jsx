@@ -5,7 +5,6 @@ import {
   CalendarDays,
   Swords,
   ShoppingBag,
-  Crown,
   Volume2,
   VolumeX,
   Sparkles,
@@ -29,7 +28,6 @@ export default function Sidebar({
   const navItems = [
     { id: 'home',    label: 'Home',     mobileLabel: 'Home',    icon: Home },
     { id: 'quests',  label: 'Active Quests', mobileLabel: 'Quests', icon: Scroll, badge: activeQuestsCount },
-    { id: 'persona', label: 'Persona & Avatar', mobileLabel: 'Persona', icon: Crown, extra: 'Archetype' },
     { id: 'streak',  label: 'Streak Calendar', mobileLabel: 'Streak', icon: CalendarDays, extra: `${user.streak?.currentStreak || 1}d` },
     { id: 'dailies', label: 'Daily Quests', mobileLabel: 'Dailies', icon: Swords, extra: '24h' },
     { id: 'store',   label: 'Store & Armory', mobileLabel: 'Store', icon: ShoppingBag, extra: `${user.character?.gold || 0}g` },

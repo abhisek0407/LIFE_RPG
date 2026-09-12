@@ -31,7 +31,14 @@ const dailyQuestSchema = new Schema(
 // Call this at the start of each day (e.g. in GET /daily-quests)
 // to auto-reset completion status on a new calendar day.
 dailyQuestSchema.methods.resetIfNewDay = function () {
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const toLocalDateKey = (date = new Date()) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+    };
+
+    const today = toLocalDateKey();
     if (this.lastCompletedDate !== today) {
         this.isCompletedToday = false;
         return this.save();

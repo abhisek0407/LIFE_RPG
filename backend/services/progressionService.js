@@ -25,9 +25,16 @@ export async function awardXp(user, domain, baseXp) {
 
     user.character.totalXpEarned += xpAwarded;
 
-    // overallLevel = sum of the three domain levels (simple, transparent metric)
-    user.character.overallLevel =
-        user.domains.health.level + user.domains.mental.level + user.domains.skill.level;
+    const domainLevels = [
+        user.domains.health.level,
+        user.domains.mental.level,
+        user.domains.skill.level,
+    ];
+
+    user.character.overallLevel = Math.max(
+        1,
+        Math.floor(domainLevels.reduce((sum, level) => sum + level, 0) / domainLevels.length)
+    );
 
     return {
         baseXp,
@@ -49,17 +56,25 @@ export function awardGold(user, amount) {
 // ── Streak check (call on any activity completion) ────────────
 // Increments streak once per calendar day, uses a freeze if a day
 // was missed and one is available, otherwise resets to 1.
+const toLocalDateKey = (date) => {
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+};
+
 export function updateStreak(user) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toLocalDateKey(new Date());
     const lastDate = user.streak.lastActivityDate
-        ? new Date(user.streak.lastActivityDate).toISOString().slice(0, 10)
+        ? toLocalDateKey(new Date(user.streak.lastActivityDate))
         : null;
 
     if (lastDate === today) {
         return { changed: false }; // already counted today
     }
 
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const yesterday = toLocalDateKey(new Date(Date.now() - 86400000));
 
     if (lastDate === yesterday) {
         user.streak.currentStreak += 1;

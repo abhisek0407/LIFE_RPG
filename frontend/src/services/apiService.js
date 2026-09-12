@@ -552,6 +552,21 @@ class ApiService {
     };
   }
 
+  // DELETE /api/daily-quests/:id
+  async deleteDaily(dailyId) {
+    const res = await this.request(`/daily-quests/${dailyId}`, { method: "DELETE" });
+
+    if (res?.message || res?.success) {
+      return { success: true, message: res.message || "Daily quest deleted" };
+    }
+
+    const dailies = storageService.getDailies();
+    const filtered = dailies.filter((d) => (d.id ?? d._id) !== dailyId);
+    storageService.saveDailies(filtered);
+
+    return { success: true, message: "Daily quest deleted" };
+  }
+
   /* ==================== 5. STORE & INVENTORY ==================== */
 
   // GET /api/store/items
@@ -623,7 +638,7 @@ class ApiService {
   // GET /api/streaks
   async getStreakData() {
     const res = await this.request("/streaks");
-    if (res?.currentStreak !== undefined || res?.streak) {
+    if (res?.currentStreak !== undefined || res?.streak || res?.recentDays) {
       const streakObj = res.streak || {};
       return {
         currentStreak: res.currentStreak ?? streakObj.currentStreak ?? 1,
@@ -631,6 +646,7 @@ class ApiService {
         multiplier: res.multiplier ?? getStreakMultiplier(streakObj.currentStreak || 1),
         freezesAvailable: res.freezesAvailable ?? streakObj.streakFreezesAvailable ?? 0,
         heatmap: res.heatmap || [],
+        recentDays: res.recentDays || res.heatmap || [],
       };
     }
 
@@ -640,6 +656,8 @@ class ApiService {
       longestStreak: user.streak?.longestStreak || 1,
       multiplier: getStreakMultiplier(user.streak?.currentStreak || 1),
       freezesAvailable: user.streak?.streakFreezesAvailable || 1,
+      heatmap: [],
+      recentDays: [],
     };
   }
 

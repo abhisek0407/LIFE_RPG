@@ -7,7 +7,6 @@ import StreakCalendarView from "./components/StreakCalendarView";
 import DailyQuestsView from "./components/DailyQuestsView";
 import StoreView from "./components/StoreView";
 import ActiveQuestsView from "./components/ActiveQuestsView";
-import PersonaAvatarView from "./components/PersonaAvatarView";
 import QuestDecompositionModal from "./components/QuestDecompositionModal";
 import FeelStuckModal from "./components/FeelStuckModal";
 import LevelUpModal from "./components/LevelUpModal";
@@ -17,7 +16,7 @@ import LoginPage from "./components/LoginPage";
 import RegisterPage from "./components/RegisterPage";
 import { apiService } from "./services/apiService";
 import { storageService } from "./services/storageService";
-import { DOMAINS, applyProgression } from "./services/rpgEngine";
+import { DOMAINS, applyProgression, getEffectiveOverallLevel, getPlayerTitle } from "./services/rpgEngine";
 import ForgotPasswordPage from "./components/ForgotPasswordPage";
 import ResetPasswordPage from "./components/ResetPasswordPage";
 import ProfileSettings from "./components/ProfileSettings";
@@ -69,7 +68,15 @@ export default function App() {
         const currentUser = await apiService.getCurrentUser();
 
         if (currentUser) {
-          setUser(currentUser);
+          const normalizedUser = {
+            ...currentUser,
+            character: {
+              ...currentUser.character,
+              overallLevel: getEffectiveOverallLevel(currentUser),
+              title: getPlayerTitle(getEffectiveOverallLevel(currentUser)),
+            },
+          };
+          setUser(normalizedUser);
         } else {
           apiService.setToken(null);
         }
@@ -113,7 +120,8 @@ export default function App() {
   // Automatic dopamine streak popup on login / session visit
   const [isStreakModalOpen, setIsStreakModalOpen] = useState(() => {
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const date = new Date();
+      const today = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
       const lastShown = sessionStorage.getItem("lrpg_streak_popup_shown");
       if (lastShown === today) return false;
       sessionStorage.setItem("lrpg_streak_popup_shown", today);
@@ -367,6 +375,14 @@ export default function App() {
     setDailies((prev) => [...prev, created]);
   };
 
+  const handleDeleteDaily = async (daily) => {
+    const dailyId = daily?.id ?? daily?._id;
+    if (!dailyId) return;
+
+    await apiService.deleteDaily(dailyId);
+    setDailies((prev) => prev.filter((item) => (item.id ?? item._id) !== dailyId));
+  };
+
   const handleBuyItem = async (item) => {
     const result = await apiService.buyStoreItem(item, user);
     if (result?.updatedUser) {
@@ -483,7 +499,6 @@ export default function App() {
           soundEnabled={soundEnabled}
           setSoundEnabled={setSoundEnabled}
           onOpenStreakModal={() => setIsStreakModalOpen(true)}
-          onOpenPersonaTab={() => setActiveTab("persona")}
           onOpenProfile={() => setActiveTab("profile")}
         />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-6xl w-full mx-auto space-y-8">
@@ -513,14 +528,6 @@ export default function App() {
             />
           )}
 
-          {activeTab === "persona" && (
-            <PersonaAvatarView
-              user={user}
-              onUpdateUser={(updated) => setUser(updated)}
-              onShowFeedback={showFeedback}
-            />
-          )}
-
           {activeTab === "streak" && (
             <StreakCalendarView
               user={user}
@@ -533,6 +540,7 @@ export default function App() {
               dailies={dailies}
               onToggleDaily={handleToggleDaily}
               onAddDaily={handleAddDaily}
+              onDeleteDaily={handleDeleteDaily}
             />
           )}
 

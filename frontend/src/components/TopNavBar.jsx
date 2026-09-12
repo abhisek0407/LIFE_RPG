@@ -14,9 +14,8 @@ import {
   User,
   Settings,
   ChevronDown,
-  Shield,
 } from "lucide-react";
-import { DOMAINS, getStreakMultiplier } from "../services/rpgEngine";
+import { DOMAINS, getEffectiveOverallLevel, getStreakMultiplier } from "../services/rpgEngine";
 
 export default function TopNavBar({
   user,
@@ -27,7 +26,6 @@ export default function TopNavBar({
   soundEnabled,
   setSoundEnabled,
   onOpenStreakModal,
-  onOpenPersonaTab,
   onOpenProfile,
 }) {
   const { domains, character, streak, email, username } = user;
@@ -53,10 +51,9 @@ export default function TopNavBar({
     },
   ];
 
-  const avatarUrl = character?.avatarUrl || null;
   const displayEmail = email || user?.email || "adventurer@lrpg.app";
   const displayName = username || character?.name || "Adventurer";
-  const overallLevel = character?.overallLevel || character?.level || 1;
+  const overallLevel = getEffectiveOverallLevel(user);
 
   useEffect(() => {
     const handler = (e) => {
@@ -216,20 +213,8 @@ export default function TopNavBar({
             onClick={() => setDropdownOpen((v) => !v)}
             className="flex items-center gap-2 sm:gap-2.5 pl-1.5 sm:pl-2.5 pr-1.5 sm:pr-2 py-1 sm:py-1.5 rounded-2xl bg-slate-100 dark:bg-rpg-card/80 border border-slate-200 dark:border-rpg-border hover:border-cyan-400 dark:hover:border-cyan-500/60 transition-all"
           >
-            {/* Avatar */}
-            <div className="relative">
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={displayName}
-                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-cyan-400/60 dark:border-cyan-500/50"
-                />
-              ) : (
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-cyan-400 to-indigo-500 flex items-center justify-center border-2 border-cyan-400/50 dark:border-cyan-500/40">
-                  <UserCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                </div>
-              )}
-              <span className="absolute bottom-0 right-0 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-emerald-400 rounded-full border-2 border-white dark:border-rpg-dark" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-cyan-400 to-indigo-500 flex items-center justify-center border-2 border-cyan-400/50 dark:border-cyan-500/40 shrink-0">
+              <UserCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
 
             {/* Name — hidden on mobile */}
@@ -253,19 +238,8 @@ export default function TopNavBar({
               {/* Profile header */}
               <div className="px-4 py-3.5 bg-gradient-to-r from-cyan-50 to-indigo-50 dark:from-cyan-950/40 dark:to-indigo-950/40 border-b border-slate-200 dark:border-rpg-border">
                 <div className="flex items-center gap-3">
-                  <div className="relative">
-                    {avatarUrl ? (
-                      <img
-                        src={avatarUrl}
-                        alt={displayName}
-                        className="w-10 h-10 rounded-full object-cover border-2 border-cyan-400/60"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-indigo-500 flex items-center justify-center border-2 border-cyan-400/50">
-                        <UserCircle2 className="w-6 h-6 text-white" />
-                      </div>
-                    )}
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-white dark:border-rpg-dark" />
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-indigo-500 flex items-center justify-center border-2 border-cyan-400/50">
+                    <UserCircle2 className="w-6 h-6 text-white" />
                   </div>
                   <div className="min-w-0">
                     <p className="font-bold text-sm text-slate-900 dark:text-white truncate">
@@ -292,28 +266,6 @@ export default function TopNavBar({
                 <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
                   <User className="w-3 h-3" /> Profile
                 </p>
-
-                {/* Character & Persona */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDropdownOpen(false);
-                    if (onOpenPersonaTab) onOpenPersonaTab();
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left hover:bg-slate-100 dark:hover:bg-rpg-card transition-colors"
-                >
-                  <Shield className="w-4 h-4 text-cyan-500 dark:text-cyan-400 shrink-0" />
-
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                      Character & Persona
-                    </p>
-
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">
-                      {character?.title || "Novice Adventurer"}
-                    </p>
-                  </div>
-                </button>
 
                 {/* Edit Profile */}
                 <button

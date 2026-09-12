@@ -18,6 +18,12 @@ const characterSchema = new Schema(
     { _id: false }
 );
 
+const defaultDomainState = () => ({
+    level: 1,
+    currentXp: 0,
+    xpToNextLevel: 100,
+});
+
 const domainStateSchema = new Schema(
     {
         level: { type: Number, default: 1 },
@@ -31,15 +37,15 @@ const domainsSchema = new Schema(
     {
         health: {
             type: domainStateSchema,
-            default: () => ({}),
+            default: defaultDomainState,
         },
         mental: {
             type: domainStateSchema,
-            default: () => ({}),
+            default: defaultDomainState,
         },
         skill: {
             type: domainStateSchema,
-            default: () => ({}),
+            default: defaultDomainState,
         },
     },
     { _id: false }

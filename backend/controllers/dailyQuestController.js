@@ -1,12 +1,19 @@
 import DailyQuest from "../models/dailyQuestSchema.js";
 import { awardXp, awardGold, updateStreak, logActivity } from "../services/progressionService.js";
 
-// Helper: "YYYY-MM-DD" for today / yesterday
+// Helper: "YYYY-MM-DD" for today / yesterday in the server's local timezone
+function toLocalDateKey(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
 function todayStr() {
-    return new Date().toISOString().slice(0, 10);
+    return toLocalDateKey(new Date());
 }
 function yesterdayStr() {
-    return new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    return toLocalDateKey(new Date(Date.now() - 86400000));
 }
 
 // Resets isCompletedToday on a new day, and breaks streakDays back to 0
