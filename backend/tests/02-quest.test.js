@@ -10,6 +10,8 @@ const stamp = Date.now();
 const testUser = {
     name: "Quest Test User",
     username: `questtest_${stamp}`,
+    gender: "prefer_not_to_say",
+    age: 25,
     email: `questtest_${stamp}@example.com`,
     gender: "male",
     age: 21,
@@ -20,6 +22,8 @@ const testUser = {
 const strangerUser = {
     name: "Stranger Test User",
     username: `stranger_${stamp}`,
+    gender: "prefer_not_to_say",
+    age: 25,
     email: `stranger_${stamp}@example.com`,
     gender: "female",
     age: 22,

@@ -10,6 +10,8 @@ const stamp = Date.now();
 const testUser = {
     name: "Streak Test User",
     username: `streaktest_${stamp}`,
+    gender: "prefer_not_to_say",
+    age: 25,
     email: `streaktest_${stamp}@example.com`,
     gender: "male",
     age: 21,

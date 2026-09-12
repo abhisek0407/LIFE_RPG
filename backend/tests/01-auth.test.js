@@ -8,6 +8,8 @@ const stamp = Date.now();
 const testUser = {
     name: "Auth Test User",
     username: `authtest_${stamp}`,
+    gender: "prefer_not_to_say",
+    age: 25,
     email: `authtest_${stamp}@example.com`,
     gender: "male",
     age: 21,

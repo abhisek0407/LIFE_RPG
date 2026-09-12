@@ -10,6 +10,8 @@ const stamp = Date.now();
 const testUser = {
     name: "AI Test User",
     username: `aitest_${stamp}`,
+    gender: "prefer_not_to_say",
+    age: 25,
     email: `aitest_${stamp}@example.com`,
     gender: "male",
     age: 21,

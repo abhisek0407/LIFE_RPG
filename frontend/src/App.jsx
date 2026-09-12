@@ -98,7 +98,7 @@ export default function App() {
     }
     try {
       localStorage.setItem("lrpg_theme", theme);
-    } catch (e) {}
+    } catch (e) { }
   }, [theme]);
   const handleLogout = async () => {
     try {
@@ -113,6 +113,7 @@ export default function App() {
   };
   const [isDecomposeOpen, setIsDecomposeOpen] = useState(false);
   const [decomposeInitialTask, setDecomposeInitialTask] = useState("");
+  const [voiceQuestResult, setVoiceQuestResult] = useState(null);
   const [isFeelStuckOpen, setIsFeelStuckOpen] = useState(false);
   const [levelUpData, setLevelUpData] = useState(null);
   const [floatingFeedback, setFloatingFeedback] = useState(null);
@@ -183,7 +184,19 @@ export default function App() {
   };
 
   const handleTriggerDecompose = (taskQuery = "") => {
+    setVoiceQuestResult(null);
     setDecomposeInitialTask(taskQuery);
+    setIsDecomposeOpen(true);
+  };
+
+  // Called by OverwhelmedHero once Sarvam STT returns a final transcript.
+  // The transcript (any language) goes straight to Gemini, which returns
+  // title + domain + microtasks in one shot — the modal then opens already
+  // on the "decomposed" screen, ready for the user to hit Accept Quest.
+  const handleVoiceQuest = async (transcript) => {
+    const result = await apiService.voiceDecomposeTask({ transcript });
+    setDecomposeInitialTask("");
+    setVoiceQuestResult(result);
     setIsDecomposeOpen(true);
   };
 
@@ -349,10 +362,10 @@ export default function App() {
       prev.map((d) =>
         d.id === daily.id
           ? {
-              ...d,
-              isCompletedToday: true,
-              streakDays: (d.streakDays || 0) + 1,
-            }
+            ...d,
+            isCompletedToday: true,
+            streakDays: (d.streakDays || 0) + 1,
+          }
           : d,
       ),
     );
@@ -540,6 +553,7 @@ export default function App() {
                 username={user.username}
                 onTriggerDecompose={handleTriggerDecompose}
                 onTriggerFeelStuck={handleTriggerFeelStuck}
+                onVoiceQuest={handleVoiceQuest}
               />
 
               <ActiveQuestsList
@@ -596,8 +610,12 @@ export default function App() {
 
       <QuestDecompositionModal
         isOpen={isDecomposeOpen}
-        onClose={() => setIsDecomposeOpen(false)}
+        onClose={() => {
+          setIsDecomposeOpen(false);
+          setVoiceQuestResult(null);
+        }}
         initialTask={decomposeInitialTask}
+        voiceResult={voiceQuestResult}
         onSaveQuest={handleSaveQuest}
       />
 

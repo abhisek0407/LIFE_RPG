@@ -458,6 +458,39 @@ class ApiService {
     return generateMicrotasks({ task, domain, difficulty, motivationLevel });
   }
 
+  // POST /api/ai/voice-decompose
+  // Used by the Sarvam STT voice flow: no domain is picked by the user yet,
+  // so the backend (Gemini) infers title + domain + microtasks in one call.
+  async voiceDecomposeTask({ transcript, motivationLevel = "medium" }) {
+    const res = await this.request("/ai/voice-decompose", {
+      method: "POST",
+      body: JSON.stringify({ transcript, motivationLevel }),
+    });
+
+    if (res?.microtasks) {
+      return res;
+    }
+
+    // Local AI decomposition engine fallback (offline / backend unreachable)
+    const local = generateMicrotasks({
+      task: transcript,
+      domain: undefined,
+      difficulty: "medium",
+      motivationLevel,
+    });
+
+    return {
+      title: local.task,
+      domain: local.domain,
+      microtasks: local.microtasks,
+      totalXp: local.totalXp,
+      totalGold: local.totalGold,
+      analysis: local.analysis,
+      motivationLevel,
+      source: "local-fallback",
+    };
+  }
+
   // POST /api/ai/feel-stuck
   async feelStuckRescue(feelingContext = "paralyzed") {
     const res = await this.request("/ai/feel-stuck", {
