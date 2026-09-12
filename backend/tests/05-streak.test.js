@@ -8,8 +8,12 @@ import ActivityLog from "../models/activityLogSchema.js";
 
 const stamp = Date.now();
 const testUser = {
+    name: "Streak Test User",
     username: `streaktest_${stamp}`,
     email: `streaktest_${stamp}@example.com`,
+    gender: "male",
+    age: 21,
+    profilePic: null,
     password: "TestPassword123!",
 };
 
@@ -81,11 +85,15 @@ test("GET /api/streaks — heatmap reflects activity after completing a daily qu
 });
 
 test("GET /api/streaks — only counts the requesting user's own activity", async () => {
-    const otherUser = {
-        username: `streakother_${stamp}`,
-        email: `streakother_${stamp}@example.com`,
-        password: "TestPassword123!",
-    };
+   const otherUser = {
+    name: "Other Streak User",
+    username: `streakother_${stamp}`,
+    email: `streakother_${stamp}@example.com`,
+    gender: "female",
+    age: 22,
+    profilePic: null,
+    password: "TestPassword123!",
+};
     const otherClient = makeApiClient();
     const reg = await otherClient.api("POST", "/api/auth/register", otherUser, false);
     otherClient.setToken(reg.data.token);
