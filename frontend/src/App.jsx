@@ -17,10 +17,25 @@ import LoginPage from "./components/LoginPage";
 import RegisterPage from "./components/RegisterPage";
 import { apiService } from "./services/apiService";
 import { storageService } from "./services/storageService";
-import { DOMAINS } from "./services/rpgEngine";
+import { DOMAINS, applyProgression } from "./services/rpgEngine";
 import ForgotPasswordPage from "./components/ForgotPasswordPage";
 import ResetPasswordPage from "./components/ResetPasswordPage";
 import ProfileSettings from "./components/ProfileSettings";
+
+const normalizeQuestForUi = (quest = {}) => ({
+  ...quest,
+  id: quest.id ?? quest._id,
+  _id: quest._id ?? quest.id,
+  microtasks: Array.isArray(quest.microtasks)
+    ? quest.microtasks.map((microtask = {}) => ({
+        ...microtask,
+        id: microtask.id ?? microtask._id,
+        _id: microtask._id ?? microtask.id,
+        isCompleted: Boolean(microtask.isCompleted),
+      }))
+    : [],
+});
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -114,7 +129,7 @@ export default function App() {
     async function loadData() {
       try {
         const [questsData, dailiesData, storeData] = await Promise.all([
-          apiService.getQuests(),
+          apiService.getQuests("all"),
           apiService.getDailies(),
           apiService.getStoreItems(),
         ]);
@@ -186,17 +201,34 @@ export default function App() {
     gold,
     isQuestFinished,
   }) => {
-    // Optimistic UI update
+    const normalizedQuestId = questId;
+    const normalizedMicrotaskId = microtaskId;
+
+    if (user) {
+      const optimisticProgression = applyProgression({
+        userData: user,
+        domainKey: domain,
+        xpAmount: xp,
+        goldAmount: gold,
+      });
+      setUser(optimisticProgression.updatedUser);
+    }
+
     setQuests((prevQuests) =>
       prevQuests.map((quest) => {
-        if (quest.id !== questId) return quest;
-        const updatedTasks = quest.microtasks.map((m) =>
-          m.id === microtaskId
-            ? { ...m, isCompleted: true, completedAt: new Date().toISOString() }
-            : m,
-        );
+        const questKey = quest.id ?? quest._id;
+        if (questKey !== normalizedQuestId) return quest;
+
+        const updatedTasks = (quest.microtasks || []).map((m) => {
+          const taskKey = m.id ?? m._id;
+          return taskKey === normalizedMicrotaskId
+            ? { ...m, id: taskKey, _id: m._id ?? taskKey, isCompleted: true, completedAt: new Date().toISOString() }
+            : m;
+        });
+
         return {
           ...quest,
+          id: questKey,
           microtasks: updatedTasks,
           earnedXp: (quest.earnedXp || 0) + xp,
           earnedGold: (quest.earnedGold || 0) + gold,
@@ -215,8 +247,28 @@ export default function App() {
       isQuestFinished,
     });
 
-    if (result?.updatedUser) {
-      setUser(result.updatedUser);
+    const serverUser = result?.updatedUser || result?.user;
+    if (serverUser) {
+      setUser(serverUser);
+    }
+
+    if (result?.quest) {
+      const normalizedServerQuest = normalizeQuestForUi(result.quest);
+      setQuests((prevQuests) =>
+        prevQuests.map((quest) => {
+          const currentQuestId = quest.id ?? quest._id;
+          const incomingQuestId = normalizedServerQuest.id ?? normalizedServerQuest._id;
+          return currentQuestId === incomingQuestId
+            ? {
+                ...quest,
+                ...normalizedServerQuest,
+                id: incomingQuestId,
+                _id: normalizedServerQuest._id ?? incomingQuestId,
+                microtasks: normalizedServerQuest.microtasks,
+              }
+            : quest;
+        }),
+      );
     }
 
     const domainName = DOMAINS[domain]?.name || "XP";

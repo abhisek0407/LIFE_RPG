@@ -314,23 +314,17 @@ export async function resetPassword(req, res) {
 }
 export async function updateProfile(req, res) {
   try {
-    const { name, username, gender, age, profilePic } = req.body;
-
+    const { name, username, gender, age, profilePic, character } = req.body;
     const user = req.user;
-    const allowedFields = ["name", "username", "gender", "age", "profilePic"];
 
-    const invalidFields = Object.keys(req.body).filter(
-      (field) => !allowedFields.includes(field),
-    );
-
-    if (invalidFields.length > 0) {
-      return res.status(400).json({
-        error: `Cannot update field(s): ${invalidFields.join(", ")}`,
+    if (!user) {
+      return res.status(401).json({
+        error: "Authentication required",
       });
     }
 
     if (name !== undefined) {
-      const normalizedName = name.trim();
+      const normalizedName = String(name).trim();
 
       if (normalizedName.length < 2) {
         return res.status(400).json({
@@ -348,7 +342,7 @@ export async function updateProfile(req, res) {
     }
 
     if (username !== undefined) {
-      const normalizedUsername = username.trim();
+      const normalizedUsername = String(username).trim();
 
       if (normalizedUsername.length < 3) {
         return res.status(400).json({
@@ -413,12 +407,63 @@ export async function updateProfile(req, res) {
 
     if (profilePic !== undefined) {
       user.profilePic =
-        profilePic === null || profilePic === "" ? null : profilePic.trim();
+        profilePic === null || profilePic === ""
+          ? null
+          : String(profilePic).trim();
+    }
+
+    if (character !== undefined && typeof character === "object" && character !== null) {
+      if (!user.character) {
+        user.character = {};
+      }
+
+      if (character.title !== undefined) {
+        const nextTitle = String(character.title).trim();
+        if (nextTitle.length > 0) {
+          user.character.title = nextTitle;
+        }
+      }
+
+      if (character.avatar !== undefined) {
+        user.character.avatar = String(character.avatar).trim();
+      }
+
+      if (character.avatarFrame !== undefined) {
+        user.character.avatarFrame = String(character.avatarFrame).trim();
+      }
+
+      if (character.avatarUrl !== undefined) {
+        user.character.avatarUrl =
+          character.avatarUrl === null || character.avatarUrl === ""
+            ? null
+            : String(character.avatarUrl).trim();
+      }
+
+      if (character.overallLevel !== undefined) {
+        const numericOverallLevel = Number(character.overallLevel);
+        if (!Number.isFinite(numericOverallLevel) || numericOverallLevel < 1) {
+          return res.status(400).json({
+            error: "Overall level must be a valid positive number",
+          });
+        }
+        user.character.overallLevel = numericOverallLevel;
+      }
+
+      if (character.gold !== undefined) {
+        const numericGold = Number(character.gold);
+        if (!Number.isFinite(numericGold) || numericGold < 0) {
+          return res.status(400).json({
+            error: "Gold must be a valid non-negative number",
+          });
+        }
+        user.character.gold = numericGold;
+      }
     }
 
     await user.save();
 
     return res.status(200).json({
+      success: true,
       message: "Profile updated successfully",
       user,
     });

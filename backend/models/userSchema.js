@@ -8,6 +8,8 @@ const characterSchema = new Schema(
     {
         title: { type: String, default: "Novice Seeker" },
         avatar: { type: String, default: "avatar_cyber_mage" },
+        avatarFrame: { type: String, default: "neon_cyan" },
+        avatarUrl: { type: String, default: null },
         overallLevel: { type: Number, default: 1 },
         totalXpEarned: { type: Number, default: 0 },
         gold: { type: Number, default: 50 },

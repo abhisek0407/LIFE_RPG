@@ -1,20 +1,43 @@
 import Quest from "../models/questSchema.js";
+import mongoose from "mongoose";
 import { awardXp, awardGold, updateStreak, logActivity } from "../services/progressionService.js";
 
 // ── GET /api/quests?status=active ────────────────────────────
 export async function getQuests(req, res) {
     try {
         const filter = { userId: req.user._id };
+        const statusQuery = req.query.status;
+        const domainQuery = req.query.domain;
 
-        // Optional ?status=active|completed|archived
-        if (req.query.status) {
-            if (!["active", "completed", "archived"].includes(req.query.status)) {
-                return res.status(400).json({ error: "Invalid status filter" });
+        // Optional ?domain=health|mental|skill
+        if (domainQuery && domainQuery !== "all") {
+            if (["health", "mental", "skill"].includes(domainQuery)) {
+                filter.domain = domainQuery;
+            } else {
+                return res.status(400).json({ error: "Invalid domain filter" });
             }
-            filter.status = req.query.status;
         }
 
-        const quests = await Quest.find(filter).sort({ createdAt: -1 });
+        // Optional ?status filter
+        if (statusQuery === "active") { filter.status = "active"; }
+        else if (statusQuery === "completed" || statusQuery === "conquered") { filter.status = "completed"; }
+        else if (statusQuery === "archived") { filter.status = "archived"; }
+        else if (statusQuery === "not_started" || statusQuery === "partially_conquered") { filter.status = "active"; }
+        // "all" or no status → no filter (return active + completed together)
+
+        let quests = await Quest.find(filter).sort({ createdAt: -1 });
+
+        // Apply in-memory filter for partially_conquered / not_started
+        if (statusQuery === "not_started") {
+            quests = quests.filter((q) => (q.microtasks || []).every((m) => !m.isCompleted));
+        } else if (statusQuery === "partially_conquered") {
+            quests = quests.filter((q) => {
+                const tasks = q.microtasks || [];
+                const done = tasks.filter((m) => m.isCompleted).length;
+                return done > 0 && done < tasks.length;
+            });
+        }
+
         return res.status(200).json({ quests });
     } catch (err) {
         console.error("getQuests error:", err);
@@ -57,21 +80,26 @@ export async function createQuest(req, res) {
             return res.status(400).json({ error: "At least one microtask is required" });
         }
 
-        for (const [i, mt] of microtasks.entries()) {
+        // Coerce and sanitize microtask rewards (client may send strings or omit values)
+        const sanitizedMicrotasks = [];
+        for (let i = 0; i < microtasks.length; i++) {
+            const mt = microtasks[i];
             if (!mt.title?.trim()) {
                 return res.status(400).json({ error: `Microtask #${i + 1} is missing a title` });
             }
-            if (typeof mt.xpReward !== "number" || mt.xpReward <= 0) {
-                return res.status(400).json({ error: `Microtask #${i + 1} needs a valid xpReward` });
-            }
-            if (typeof mt.goldReward !== "number" || mt.goldReward < 0) {
-                return res.status(400).json({ error: `Microtask #${i + 1} needs a valid goldReward` });
-            }
+            const xpReward = Number(mt.xpReward);
+            const goldReward = Number(mt.goldReward);
+            sanitizedMicrotasks.push({
+                title: mt.title.trim(),
+                order: mt.order ?? i + 1,
+                xpReward: (isFinite(xpReward) && xpReward > 0) ? Math.round(xpReward) : 20,
+                goldReward: (isFinite(goldReward) && goldReward >= 0) ? Math.round(goldReward) : 5,
+            });
         }
 
-        // ── Compute totals from microtasks (never trust client totals) ──
-        const totalXp = microtasks.reduce((sum, mt) => sum + mt.xpReward, 0);
-        const totalGold = microtasks.reduce((sum, mt) => sum + mt.goldReward, 0);
+        // ── Compute totals from sanitized microtasks ──
+        const totalXp = sanitizedMicrotasks.reduce((sum, mt) => sum + mt.xpReward, 0);
+        const totalGold = sanitizedMicrotasks.reduce((sum, mt) => sum + mt.goldReward, 0);
 
         const quest = await Quest.create({
             userId: req.user._id,
@@ -81,12 +109,7 @@ export async function createQuest(req, res) {
             motivationLevel: motivationLevel || "medium",
             totalXp,
             totalGold,
-            microtasks: microtasks.map((mt, i) => ({
-                title: mt.title.trim(),
-                order: mt.order ?? i + 1,          // auto-assign order if missing
-                xpReward: mt.xpReward,
-                goldReward: mt.goldReward,
-            })),
+            microtasks: sanitizedMicrotasks,
         });
 
         return res.status(201).json({ quest });
@@ -166,15 +189,101 @@ export async function deleteQuest(req, res) {
 }
 
 // ── PATCH /api/quests/:questId/microtasks/:microtaskId/complete ──
+// Handles BOTH real DB quests (valid ObjectId) and grounding/seed quests
+// (client-generated IDs like q_1234567890 or grounding_session).
+// XP + Gold is ALWAYS persisted to MongoDB user document regardless of quest type.
 export async function completeMicrotask(req, res) {
     try {
         const { questId, microtaskId } = req.params;
+        const user = req.user;
 
-        const quest = await Quest.findOne({ _id: questId, userId: req.user._id });
-        if (!quest) {
-            return res.status(404).json({ error: "Quest not found" });
+        // Determine if questId is a real MongoDB ObjectId
+        const isValidObjectId =
+            mongoose.Types.ObjectId.isValid(questId) &&
+            String(questId).length === 24;
+
+        // ── Path A: Non-DB quest (grounding, seed, client-generated ID) ──
+        if (!isValidObjectId) {
+            const xp = Number(req.body?.xp) || 20;
+            const gold = Number(req.body?.gold) || 5;
+            const domain = ["health", "mental", "skill"].includes(req.body?.domain)
+                ? req.body.domain
+                : "mental";
+
+            const streakResult = updateStreak(user);
+            const xpResult = await awardXp(user, domain, xp);
+            awardGold(user, gold);
+            await user.save();
+
+            logActivity({
+                userId: user._id,
+                actionType: "microtask_completed",
+                domain,
+                xpGained: xpResult.xpAwarded,
+                goldGained: gold,
+                metadata: { questId, microtaskId, isGrounding: true },
+            }).catch(() => {});
+
+            return res.status(200).json({
+                success: true,
+                isGrounding: true,
+                xpAwarded: xpResult.xpAwarded,
+                bonusXp: Math.max(0, xpResult.xpAwarded - xp),
+                goldAwarded: gold,
+                streak: {
+                    currentStreak: user.streak.currentStreak,
+                    longestStreak: user.streak.longestStreak,
+                    changed: streakResult.changed,
+                },
+                progression: xpResult,
+                user,
+            });
         }
 
+        // ── Path B: Valid ObjectId — look up quest in DB ──
+        let quest = null;
+        try {
+            quest = await Quest.findOne({ _id: questId, userId: user._id });
+        } catch (_) {}
+
+        if (!quest) {
+            // Quest not found in DB — still award progression to user
+            const xp = Number(req.body?.xp) || 20;
+            const gold = Number(req.body?.gold) || 5;
+            const domain = ["health", "mental", "skill"].includes(req.body?.domain)
+                ? req.body.domain
+                : "mental";
+
+            const streakResult = updateStreak(user);
+            const xpResult = await awardXp(user, domain, xp);
+            awardGold(user, gold);
+            await user.save();
+
+            logActivity({
+                userId: user._id,
+                actionType: "microtask_completed",
+                domain,
+                xpGained: xpResult.xpAwarded,
+                goldGained: gold,
+                metadata: { questId, microtaskId, notFound: true },
+            }).catch(() => {});
+
+            return res.status(200).json({
+                success: true,
+                xpAwarded: xpResult.xpAwarded,
+                bonusXp: Math.max(0, xpResult.xpAwarded - xp),
+                goldAwarded: gold,
+                streak: {
+                    currentStreak: user.streak.currentStreak,
+                    longestStreak: user.streak.longestStreak,
+                    changed: streakResult.changed,
+                },
+                progression: xpResult,
+                user,
+            });
+        }
+
+        // ── Quest found — look up microtask ──
         const microtask = quest.microtasks.id(microtaskId);
         if (!microtask) {
             return res.status(404).json({ error: "Microtask not found" });
@@ -193,7 +302,6 @@ export async function completeMicrotask(req, res) {
         quest.earnedGold += microtask.goldReward;
 
         // ── Award progression to the user (streak-multiplied) ──
-        const user = req.user;
         const streakResult = updateStreak(user);
         const xpResult = await awardXp(user, quest.domain, microtask.xpReward);
         awardGold(user, microtask.goldReward);
@@ -203,18 +311,18 @@ export async function completeMicrotask(req, res) {
 
         await Promise.all([quest.save(), user.save()]);
 
-        // ── Activity logs ──
-        await logActivity({
+        // ── Fire-and-forget activity logs ──
+        logActivity({
             userId: user._id,
             actionType: "microtask_completed",
             domain: quest.domain,
             xpGained: xpResult.xpAwarded,
             goldGained: microtask.goldReward,
             metadata: { questId: quest._id, microtaskId: microtask._id, title: microtask.title },
-        });
+        }).catch(() => {});
 
         if (xpResult.leveledUp) {
-            await logActivity({
+            logActivity({
                 userId: user._id,
                 actionType: "level_up",
                 domain: quest.domain,
@@ -224,21 +332,22 @@ export async function completeMicrotask(req, res) {
                     newOverallLevel: xpResult.newOverallLevel,
                     levelsGained: xpResult.levelsGained,
                 },
-            });
+            }).catch(() => {});
         }
 
         if (questCompleted) {
-            await logActivity({
+            logActivity({
                 userId: user._id,
                 actionType: "quest_completed",
                 domain: quest.domain,
                 xpGained: 0,
                 goldGained: 0,
                 metadata: { questId: quest._id, title: quest.title },
-            });
+            }).catch(() => {});
         }
 
         return res.status(200).json({
+            success: true,
             quest,
             progression: xpResult,
             streak: {
@@ -246,8 +355,11 @@ export async function completeMicrotask(req, res) {
                 longestStreak: user.streak.longestStreak,
                 changed: streakResult.changed,
             },
+            xpAwarded: xpResult.xpAwarded,
+            bonusXp: Math.max(0, xpResult.xpAwarded - microtask.xpReward),
+            goldAwarded: microtask.goldReward,
             questCompleted,
-            user, // updated character/domains/gold (passwordHash stripped by toJSON)
+            user,
         });
     } catch (err) {
         console.error("completeMicrotask error:", err);

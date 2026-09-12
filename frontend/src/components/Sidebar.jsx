@@ -126,29 +126,34 @@ export default function Sidebar({
 
         {/* User mini-card */}
         <div className="p-4 border-t border-slate-200 dark:border-rpg-border bg-slate-50/50 dark:bg-rpg-darkest/40">
-          <div className="p-3 rounded-xl bg-slate-100 dark:bg-rpg-card border border-slate-200 dark:border-rpg-border flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => handleNav('profile')}
+            className="w-full text-left p-3 rounded-xl bg-slate-100 dark:bg-rpg-card border border-slate-200 dark:border-rpg-border flex items-center gap-3 hover:border-cyan-400 dark:hover:border-cyan-500/60 transition-colors"
+            title="Edit Profile"
+          >
             <div className="relative">
               <div className="w-11 h-11 rounded-lg bg-gradient-to-tr from-purple-700 to-cyan-500 flex items-center justify-center font-heading font-bold text-white shadow-md border border-cyan-400/40">
-                {user.username ? user.username.charAt(0).toUpperCase() : 'U'}
+                {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
               </div>
               <div className="absolute -bottom-1 -right-1 px-1.5 bg-amber-500 text-slate-950 font-bold text-[10px] rounded-full border border-slate-900">
-                L{user.character?.overallLevel || 1}
+                L{user?.character?.overallLevel || 1}
               </div>
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{user.username || 'Hero'}</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{user?.username || 'Hero'}</p>
                 <div className="flex items-center text-amber-500 dark:text-amber-400 text-xs font-bold gap-0.5">
                   <Flame className="w-3.5 h-3.5 fill-amber-500 dark:fill-amber-400" />
-                  <span>{user.streak?.currentStreak || 1}d</span>
+                  <span>{user?.streak?.currentStreak || 1}d</span>
                 </div>
               </div>
               <p className="text-xs text-cyan-600 dark:text-cyan-400/90 truncate flex items-center gap-1">
                 <Shield className="w-3 h-3 shrink-0" />
-                <span>{user.character?.title || 'Novice'}</span>
+                <span>{user?.character?.title || 'Novice'}</span>
               </p>
             </div>
-          </div>
+          </button>
         </div>
       </aside>
 

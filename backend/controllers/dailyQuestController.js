@@ -139,6 +139,11 @@ export async function completeDailyQuest(req, res) {
         }
 
         return res.status(200).json({
+            success: true,
+            xpAwarded: xpResult.xpAwarded,
+            goldAwarded: daily.goldReward,
+            bonusXp: Math.max(0, xpResult.xpAwarded - daily.xpReward),
+            streakDays: daily.streakDays,
             dailyQuest: daily,
             progression: xpResult,
             streak: {
@@ -146,6 +151,7 @@ export async function completeDailyQuest(req, res) {
                 longestStreak: user.streak.longestStreak,
                 changed: streakResult.changed,
             },
+            updatedUser: user,
             user,
         });
     } catch (err) {

@@ -84,6 +84,40 @@ test("GET /api/streaks — heatmap reflects activity after completing a daily qu
     assert.equal(today.goldGained, 5);
 });
 
+test("POST /api/streaks/checkin — awards a streak bonus and logs the activity", async () => {
+    const before = await api("GET", "/api/streaks");
+    assert.equal(before.status, 200);
+
+    const { status, data } = await api("POST", "/api/streaks/checkin");
+    assert.equal(status, 200, `Expected 200, got ${status}: ${JSON.stringify(data)}`);
+    assert.ok(data.success, "The endpoint should return success true");
+    assert.ok(data.xpAwarded > 0, "Check-in should award XP");
+    assert.ok(data.goldAwarded >= 0, "Check-in should award gold");
+    assert.ok(data.updatedUser, "The endpoint should return updated user data");
+    assert.ok(data.updatedUser.streak.currentStreak >= 1, "The user should retain a valid streak");
+
+    const after = await api("GET", "/api/streaks");
+    assert.equal(after.status, 200);
+    const today = after.data.heatmap.find((day) => day.date === todayStr());
+    assert.ok(today, "The new check-in should appear in the daily heatmap");
+    assert.equal(today.count, 2, "The user should have both the daily quest and the explicit check-in activity logged for today");
+});
+
+test("POST /api/activity-logs — accepts an audit record from the frontend", async () => {
+    const { status, data } = await api("POST", "/api/activity-logs", {
+        actionType: "microtask_completed",
+        domain: "skill",
+        xpGained: 25,
+        goldGained: 10,
+        metadata: { source: "frontend" },
+    });
+
+    assert.equal(status, 200, `Expected 200, got ${status}: ${JSON.stringify(data)}`);
+    assert.ok(data.log, "The endpoint should return the created activity log");
+    assert.equal(data.log.actionType, "microtask_completed");
+    assert.equal(data.log.metadata.source, "frontend");
+});
+
 test("GET /api/streaks — only counts the requesting user's own activity", async () => {
    const otherUser = {
     name: "Other Streak User",
