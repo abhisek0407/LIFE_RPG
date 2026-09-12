@@ -26,8 +26,6 @@ const dailyQuestSchema = new Schema(
     { timestamps: true }
 );
 
-dailyQuestSchema.index({ userId: 1 });
-
 // ── Instance helpers ─────────────────────────────────────────
 
 // Call this at the start of each day (e.g. in GET /daily-quests)
