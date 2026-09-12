@@ -3,7 +3,6 @@ import bcrypt from "bcryptjs";
 
 const { Schema } = mongoose;
 
-// ── Sub-schemas ──────────────────────────────────────────────
 
 const characterSchema = new Schema(
     {
@@ -28,9 +27,18 @@ const domainStateSchema = new Schema(
 
 const domainsSchema = new Schema(
     {
-        health: { type: domainStateSchema, default: () => ({}) },
-        mental: { type: domainStateSchema, default: () => ({}) },
-        skill: { type: domainStateSchema, default: () => ({}) },
+        health: {
+            type: domainStateSchema,
+            default: () => ({}),
+        },
+        mental: {
+            type: domainStateSchema,
+            default: () => ({}),
+        },
+        skill: {
+            type: domainStateSchema,
+            default: () => ({}),
+        },
     },
     { _id: false }
 );
@@ -47,24 +55,54 @@ const streakSchema = new Schema(
 
 const inventoryItemSchema = new Schema(
     {
-        itemId: { type: String, required: true },
-        name: { type: String, required: true },
+        itemId: {
+            type: String,
+            required: true,
+        },
+
+        name: {
+            type: String,
+            required: true,
+        },
+
         type: {
             type: String,
             enum: ["potion", "badge", "theme", "relic", "freeze"],
             required: true,
         },
-        quantity: { type: Number, default: 1 },
-        equipped: { type: Boolean, default: false },
-        acquiredAt: { type: Date, default: Date.now },
+
+        quantity: {
+            type: Number,
+            default: 1,
+        },
+
+        equipped: {
+            type: Boolean,
+            default: false,
+        },
+
+        acquiredAt: {
+            type: Date,
+            default: Date.now,
+        },
     },
     { _id: true }
 );
 
-// ── Main User Schema ─────────────────────────────────────────
+
 
 const userSchema = new Schema(
     {
+        
+
+        name: {
+            type: String,
+            required: [true, "Name is required"],
+            trim: true,
+            minlength: [2, "Name must be at least 2 characters"],
+            maxlength: [50, "Name cannot exceed 50 characters"],
+        },
+
         username: {
             type: String,
             required: [true, "Username is required"],
@@ -73,32 +111,94 @@ const userSchema = new Schema(
             minlength: [3, "Username must be at least 3 characters"],
             maxlength: [30, "Username cannot exceed 30 characters"],
         },
+
         email: {
             type: String,
             required: [true, "Email is required"],
             unique: true,
             lowercase: true,
             trim: true,
-            match: [/^\S+@\S+\.\S+$/, "Please provide a valid email address"],
+            match: [
+                /^\S+@\S+\.\S+$/,
+                "Please provide a valid email address",
+            ],
         },
-        passwordHash: { type: String, required: true },
+
+        gender: {
+            type: String,
+            required: [true, "Gender is required"],
+            enum: {
+                values: [
+                    "male",
+                    "female",
+                    "non-binary",
+                    "prefer_not_to_say",
+                ],
+                message: "Invalid gender",
+            },
+        },
+
+        age: {
+            type: Number,
+            required: [true, "Age is required"],
+            min: [13, "Age must be at least 13"],
+            max: [120, "Please provide a valid age"],
+        },
+
+        profilePic: {
+            type: String,
+            default: null,
+            trim: true,
+        },
+
+        
+
+        passwordHash: {
+            type: String,
+            required: true,
+        },
+
         resetPasswordToken: {
             type: String,
             default: null,
         },
+
         resetPasswordExpires: {
             type: Date,
             default: null,
         },
-        character: { type: characterSchema, default: () => ({}) },
-        domains: { type: domainsSchema, default: () => ({}) },
-        streak: { type: streakSchema, default: () => ({}) },
+
+        
+
+        character: {
+            type: characterSchema,
+            default: () => ({}),
+        },
+
+        
+
+        domains: {
+            type: domainsSchema,
+            default: () => ({}),
+        },
+
+    
+
+        streak: {
+            type: streakSchema,
+            default: () => ({}),
+        },
+
+       
+
         inventory: [inventoryItemSchema],
     },
-    { timestamps: true }
+    {
+        timestamps: true,
+    }
 );
 
-// ── Static Helpers (progression formulas from spec) ──────────
+
 
 userSchema.statics.xpRequiredForLevel = function (level) {
     return Math.floor(100 * Math.pow(level, 1.5));
@@ -108,7 +208,6 @@ userSchema.statics.streakMultiplier = function (streakDays) {
     return 1.0 + Math.min(streakDays * 0.05, 0.5);
 };
 
-// ── Password helpers ─────────────────────────────────────────
 
 userSchema.methods.comparePassword = async function (candidatePassword) {
     return bcrypt.compare(candidatePassword, this.passwordHash);
@@ -119,7 +218,6 @@ userSchema.statics.hashPassword = async function (plainPassword) {
     return bcrypt.hash(plainPassword, salt);
 };
 
-// ── Hide sensitive fields in JSON responses ──────────────────
 
 userSchema.methods.toJSON = function () {
     const obj = this.toObject();
@@ -130,6 +228,7 @@ userSchema.methods.toJSON = function () {
 
     return obj;
 };
+
 
 const User = mongoose.model("User", userSchema);
 
