@@ -322,10 +322,10 @@ export async function updateProfile(req, res) {
             profilePic,
         } = req.body;
 
-        // req.user comes from the protect middleware
+        
         const user = req.user;
 
-        // ── Update Name ──────────────────────────────────────
+    
 
         if (name !== undefined) {
             const normalizedName = name.trim();
