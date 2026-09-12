@@ -20,6 +20,7 @@ import { storageService } from "./services/storageService";
 import { DOMAINS } from "./services/rpgEngine";
 import ForgotPasswordPage from "./components/ForgotPasswordPage";
 import ResetPasswordPage from "./components/ResetPasswordPage";
+import ProfileSettings from "./components/ProfileSettings";
 export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -390,7 +391,7 @@ export default function App() {
         />
       );
     }
-         
+
     if (authPage === "reset-password") {
       return (
         <ResetPasswordPage
@@ -431,6 +432,7 @@ export default function App() {
           setSoundEnabled={setSoundEnabled}
           onOpenStreakModal={() => setIsStreakModalOpen(true)}
           onOpenPersonaTab={() => setActiveTab("persona")}
+          onOpenProfile={() => setActiveTab("profile")}
         />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-6xl w-full mx-auto space-y-8">
           {activeTab === "home" && (
@@ -487,6 +489,13 @@ export default function App() {
               user={user}
               storeItems={storeItems}
               onBuyItem={handleBuyItem}
+            />
+          )}
+          {activeTab === "profile" && (
+            <ProfileSettings
+              user={user}
+              onUpdateUser={(updatedUser) => setUser(updatedUser)}
+              onBack={() => setActiveTab("home")}
             />
           )}
         </main>
