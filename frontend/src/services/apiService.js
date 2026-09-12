@@ -457,58 +457,61 @@ class ApiService {
   // GET /api/store/items
   async getStoreItems() {
     const res = await this.request("/store/items");
+
     if (res?.items) {
-      return res.items;
+      return res.items.map((item) => ({
+        ...item,
+        id: item.id || item._id,
+      }));
     }
+
     return storageService.getStoreItems();
   }
 
   // POST /api/store/buy
   async buyStoreItem(item, user) {
+    const itemId = item.id || item._id;
+
     const res = await this.request("/store/buy", {
       method: "POST",
-      body: JSON.stringify({ itemId: item.id }),
+      body: JSON.stringify({
+        itemId,
+      }),
     });
 
-    if (res?.success) {
-      return res;
+    if (res?.user) {
+      return {
+        success: true,
+        item: res.item,
+        appliedImmediately: res.appliedImmediately,
+        updatedUser: res.user,
+      };
     }
-
-    // Local fallback
-    const currentGold = user.character?.gold || 0;
-    if (currentGold < item.costGold)
-      return { success: false, message: "Insufficient gold" };
-
-    const updatedUser = JSON.parse(JSON.stringify(user));
-    updatedUser.character.gold = currentGold - item.costGold;
-
-    const existingIndex = updatedUser.inventory.findIndex(
-      (inv) => inv.itemId === item.id,
-    );
-    if (existingIndex >= 0) {
-      updatedUser.inventory[existingIndex].quantity =
-        (updatedUser.inventory[existingIndex].quantity || 1) + 1;
-    } else {
-      updatedUser.inventory.push({
-        itemId: item.id,
-        name: item.name,
-        type: item.type,
-        quantity: 1,
-        equipped: false,
-      });
-    }
-
-    if (item.type === "freeze") {
-      updatedUser.streak.streakFreezesAvailable =
-        (updatedUser.streak.streakFreezesAvailable || 0) + 1;
-    }
-
-    storageService.saveUser(updatedUser);
 
     return {
-      success: true,
-      remainingGold: updatedUser.character.gold,
-      updatedUser,
+      success: false,
+      error: res?.error || "Failed to purchase item",
+    };
+  }
+  // POST /api/store/use/:itemId
+  async useStoreItem(itemId) {
+    const res = await this.request(`/store/use/${itemId}`, {
+      method: "POST",
+    });
+
+    if (res?.user) {
+      return {
+        success: true,
+        message: res.message,
+        effect: res.effect,
+        remainingQuantity: res.remainingQuantity,
+        updatedUser: res.user,
+      };
+    }
+
+    return {
+      success: false,
+      error: res?.error || "Failed to use item",
     };
   }
 

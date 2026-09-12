@@ -321,6 +321,21 @@ export default function App() {
       setUser(result.updatedUser);
     }
   };
+  const handleUseItem = async (item) => {
+    const itemId = item.itemId || item._id;
+
+    const result = await apiService.useStoreItem(itemId);
+
+    if (result?.updatedUser) {
+      setUser(result.updatedUser);
+    }
+
+    if (result?.success) {
+      alert(result.message);
+    } else {
+      alert(result?.error || "Unable to use item");
+    }
+  };
 
   const handleClaimDailyCheckIn = async () => {
     const result = await apiService.claimStreakCheckin(user);
@@ -489,6 +504,7 @@ export default function App() {
               user={user}
               storeItems={storeItems}
               onBuyItem={handleBuyItem}
+              onUseItem={handleUseItem}
             />
           )}
           {activeTab === "profile" && (
