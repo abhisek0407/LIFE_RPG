@@ -82,6 +82,14 @@ const userSchema = new Schema(
             match: [/^\S+@\S+\.\S+$/, "Please provide a valid email address"],
         },
         passwordHash: { type: String, required: true },
+        resetPasswordToken: {
+            type: String,
+            default: null,
+        },
+        resetPasswordExpires: {
+            type: Date,
+            default: null,
+        },
         character: { type: characterSchema, default: () => ({}) },
         domains: { type: domainsSchema, default: () => ({}) },
         streak: { type: streakSchema, default: () => ({}) },
@@ -115,7 +123,11 @@ userSchema.statics.hashPassword = async function (plainPassword) {
 
 userSchema.methods.toJSON = function () {
     const obj = this.toObject();
+
     delete obj.passwordHash;
+    delete obj.resetPasswordToken;
+    delete obj.resetPasswordExpires;
+
     return obj;
 };
 

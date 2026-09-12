@@ -5,11 +5,10 @@ export async function protect(req, res, next) {
     try {
         let token;
 
-        // 1. Bearer header
         if (req.headers.authorization?.startsWith("Bearer ")) {
             token = req.headers.authorization.split(" ")[1];
         }
-        // 2. httpOnly cookie
+       
         else if (req.cookies?.token) {
             token = req.cookies.token;
         }
@@ -25,7 +24,7 @@ export async function protect(req, res, next) {
             return res.status(401).json({ error: "Not authorized — user not found" });
         }
 
-        req.user = user; // full user doc available in all protected routes
+        req.user = user; 
         next();
     } catch (err) {
         return res.status(401).json({ error: "Not authorized — invalid token" });
