@@ -23,6 +23,11 @@ export default function FloatingFeedback({ feedback }) {
             <Coins className="w-3 h-3 fill-amber-400" />
             <span>+{feedback.gold} Gold Earned</span>
           </div>
+          {feedback.note && (
+            <div className="text-[10px] text-slate-300 mt-0.5 max-w-[200px] truncate">
+              📷 {feedback.note}
+            </div>
+          )}
         </div>
       </div>
     </div>

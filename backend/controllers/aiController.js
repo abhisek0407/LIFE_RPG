@@ -1,6 +1,9 @@
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
-async function callGeminiJSON(prompt) {
+// `parts` lets callers pass extra content blocks (e.g. an inline image) alongside
+// the text prompt. Nothing here writes anything to disk — it's all in-memory,
+// request-scoped, and thrown away once this function returns.
+async function callGeminiJSON(prompt, extraParts = []) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not configured");
@@ -11,7 +14,7 @@ async function callGeminiJSON(prompt) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            contents: [{ role: "user", parts: [{ text: prompt }, ...extraParts] }],
             generationConfig: {
                 temperature: 0.7,
                 responseMimeType: "application/json",
@@ -139,9 +142,7 @@ function normalizeFeelStuck(parsed) {
     }
 
     const groundingMicrotasks = groundingRaw.slice(0, 4).map((mt, i) => ({
-        id: mt.id || mt._id || `grounding_${i + 1}_${Date.now()}`,
         title: typeof mt.title === "string" && mt.title.trim() ? mt.title.trim() : `Grounding step ${i + 1}`,
-        domain: ["health", "mental", "skill"].includes(mt.domain) ? mt.domain : "mental",
         xpReward: Number.isFinite(mt.xpReward) && mt.xpReward > 0 ? Math.round(mt.xpReward) : 10,
         goldReward: Number.isFinite(mt.goldReward) && mt.goldReward >= 0 ? Math.round(mt.goldReward) : 0,
     }));
@@ -189,13 +190,10 @@ function decomposeWithRules(description, domain, motivation) {
     };
 
     const steps = templates[motivation] || templates.medium;
-    const microtasks = steps.map((step, i) => ({
-        id: `mt_dec_${i + 1}_${Date.now()}`,
+    const microtasks = steps.map((step) => ({
         title: `${step.suffix} ${description}`,
-        order: i + 1,
         xpReward: step.xpReward,
         goldReward: Math.round(step.xpReward * 0.3),
-        isCompleted: false,
     }));
 
     return {
@@ -218,7 +216,6 @@ function guessDomainFromText(text) {
 }
 
 function feelStuckFallback(domain) {
-    const activeDomain = ["health", "mental", "skill"].includes(domain) ? domain : "mental";
     return {
         breathingExercise: {
             name: "Box Breathing",
@@ -230,9 +227,9 @@ function feelStuckFallback(domain) {
             ],
         },
         groundingMicrotasks: [
-            { id: "grounding_1", domain: activeDomain, title: "Name 3 things you can see around you", xpReward: 10, goldReward: 0 },
-            { id: "grounding_2", domain: "health", title: "Stand up and stretch for 30 seconds", xpReward: 10, goldReward: 0 },
-            { id: "grounding_3", domain: "health", title: "Drink a glass of water", xpReward: 10, goldReward: 0 },
+            { title: "Name 3 things you can see around you", xpReward: 10, goldReward: 0 },
+            { title: "Stand up and stretch for 30 seconds", xpReward: 10, goldReward: 0 },
+            { title: "Drink a glass of water", xpReward: 10, goldReward: 0 },
         ],
         encouragement: domain
             ? `Feeling stuck on something in your ${domain} domain is normal — a tiny reset can help.`
@@ -244,16 +241,16 @@ function feelStuckFallback(domain) {
 // body: { description, domain, motivationLevel? }
 export async function decomposeTask(req, res) {
     try {
-        const rawDescription = req.body.description || req.body.task;
-        if (!rawDescription?.trim()) {
+        const { description, domain, motivationLevel } = req.body;
+
+        if (!description?.trim()) {
             return res.status(400).json({ error: "description is required" });
         }
-        if (req.body.domain && !["health", "mental", "skill"].includes(req.body.domain)) {
+        if (!["health", "mental", "skill"].includes(domain)) {
             return res.status(400).json({ error: "domain must be health, mental, or skill" });
         }
-        const domain = req.body.domain || "mental";
-        const motivation = ["low", "medium", "high"].includes(req.body.motivationLevel) ? req.body.motivationLevel : "medium";
-        const trimmedDescription = rawDescription.trim();
+        const motivation = ["low", "medium", "high"].includes(motivationLevel) ? motivationLevel : "medium";
+        const trimmedDescription = description.trim();
 
         let result;
         let source;
@@ -316,6 +313,75 @@ export async function voiceDecomposeTask(req, res) {
         console.error("voiceDecomposeTask error:", err);
         return res.status(500).json({ error: "Failed to decompose voice quest" });
     }
+}
+
+// ── Proof-of-completion image analysis (used by daily quests) ───────
+// Takes a base64 data URL (e.g. "data:image/png;base64,AAAA...") and asks
+// Gemini for a one-line description of what it shows. The image bytes are
+// only ever held in memory for the duration of this call — this function
+// never writes them to disk or to the database, and returns nothing but
+// the short text description for the caller to log.
+export async function analyzeProofImage(base64DataUrl, questTitle) {
+    const match = /^data:(image\/[a-zA-Z+]+);base64,(.+)$/.exec(base64DataUrl || "");
+    if (!match) {
+        throw new Error("proofImage must be a base64 image data URL");
+    }
+    const [, mimeType, base64Data] = match;
+
+    const prompt = `You are a proof-of-completion checker for a gamified habit app. A user is trying to complete this daily habit:
+"${questTitle}"
+They submitted the attached photo/screenshot as evidence.
+
+Do the following:
+1. Decide if the image is genuinely plausible evidence for THIS habit (matches = true) or is clearly unrelated / doesn't show anything relevant (matches = false). Be reasonably lenient — a relevant photo doesn't need to be perfect proof, just plausibly related.
+2. In one short sentence (max 15 words), describe what the image shows.
+3. Rate the quality/convincingness of this proof on a scale of 1 to 10, where 1 = barely plausible or very weak evidence, 5 = an ordinary, adequate photo that reasonably supports the habit, and 10 = exceptionally clear, specific, unmistakable proof of real completion. If matches is false, score should be 1-3.
+4. If the habit title implies a measurable numeric target (e.g. "Run 200m", "Drink 2L water", "8000 steps", "Read 20 pages", "Meditate 10 minutes") AND the image shows a specific achieved number for that same metric, extract both numbers. Otherwise leave them null.
+5. If both numbers are present and the achieved value exceeds the target, compute how many percent over target it is. Otherwise 0.
+
+Respond with ONLY valid JSON, no markdown fences, in exactly this shape:
+{
+  "matches": true or false,
+  "description": "string",
+  "score": number (1-10),
+  "targetValue": number or null,
+  "achievedValue": number or null,
+  "unit": "string or null",
+  "overPerformancePercent": number
+}`;
+
+    const parsed = await callGeminiJSON(prompt, [
+        { inlineData: { mimeType, data: base64Data } },
+    ]);
+
+    const description =
+        typeof parsed?.description === "string" && parsed.description.trim()
+            ? parsed.description.trim().slice(0, 200)
+            : null;
+    if (!description) {
+        throw new Error("Gemini response missing a usable description");
+    }
+
+    const matches = parsed?.matches !== false; // default to lenient (true) unless explicitly false
+    const overPerformancePercent =
+        Number.isFinite(parsed?.overPerformancePercent) && parsed.overPerformancePercent > 0
+            ? Math.min(100, Math.round(parsed.overPerformancePercent)) // capped at +100% bonus
+            : 0;
+
+    // Score is Gemini's 1-10 read on how convincing the proof is. Default to
+    // a neutral 5 (or a low 2 for a non-match) if it forgets to include one.
+    const rawScore = Number.isFinite(parsed?.score) ? Math.round(parsed.score) : matches ? 5 : 2;
+    const score = Math.min(10, Math.max(1, rawScore));
+
+    return {
+        matches,
+        description,
+        score,
+        targetValue: Number.isFinite(parsed?.targetValue) ? parsed.targetValue : null,
+        achievedValue: Number.isFinite(parsed?.achievedValue) ? parsed.achievedValue : null,
+        unit: typeof parsed?.unit === "string" ? parsed.unit : null,
+        overPerformancePercent,
+    };
 }
 
 // ── POST /api/ai/feel-stuck ──────────────────────────────────────

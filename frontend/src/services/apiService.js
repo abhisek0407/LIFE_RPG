@@ -9,57 +9,7 @@ import { applyProgression, DOMAINS, getStreakMultiplier } from "./rpgEngine";
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
-const normalizeMicrotask = (microtask = {}) => ({
-  ...microtask,
-  id: microtask.id ?? microtask._id,
-  _id: microtask._id ?? microtask.id,
-  isCompleted: Boolean(microtask.isCompleted),
-  completedAt: microtask.completedAt ?? null,
-});
-
-const normalizeQuest = (quest = {}) => ({
-  ...quest,
-  id: quest.id ?? quest._id,
-  _id: quest._id ?? quest.id,
-  microtasks: Array.isArray(quest.microtasks)
-    ? quest.microtasks.map(normalizeMicrotask)
-    : [],
-});
-
-const normalizeDailyQuest = (daily = {}) => ({
-  ...daily,
-  id: daily.id ?? daily._id,
-  _id: daily._id ?? daily.id,
-  isCompletedToday: Boolean(daily.isCompletedToday),
-  streakDays: Number(daily.streakDays) || 0,
-});
-
-const normalizeStoreItem = (item = {}) => ({
-  ...item,
-  id: item.id ?? item._id,
-  _id: item._id ?? item.id,
-  effectText:
-    item.effectText ||
-    (item.effect?.type
-      ? `${item.effect.type.replace(/_/g, " ")}${item.effect.value ? ` (${item.effect.value})` : ""}`
-      : "Special in-game advantage"),
-});
-
 class ApiService {
-  normalizeQuest(quest) {
-  if (!quest) return quest;
-
-  return {
-    ...quest,
-
-    id: quest.id || quest._id,
-
-    microtasks: (quest.microtasks || []).map((microtask) => ({
-      ...microtask,
-      id: microtask.id || microtask._id,
-    })),
-  };
-}
   constructor() {
     this.token =
       typeof window !== "undefined"
@@ -121,6 +71,8 @@ class ApiService {
           success: false,
           status: res.status,
           error: data?.error || data?.message || "Request failed",
+          code: data?.code || null,
+          description: data?.description || null,
         };
       }
 
@@ -307,7 +259,7 @@ class ApiService {
   async getQuests(status = "active") {
     const res = await this.request(`/quests?status=${status}`);
     if (res?.quests) {
-      return res.quests.map(normalizeQuest);
+      return res.quests;
     }
     return storageService.getQuests();
   }
@@ -320,8 +272,7 @@ class ApiService {
     });
 
     if (res?.quest) {
-      return normalizeQuest(res.quest);
-      return this.normalizeQuest(res.quest);
+      return res.quest;
     }
 
     // Local fallback
@@ -345,34 +296,8 @@ class ApiService {
       `/quests/${questId}/microtasks/${microtaskId}/complete`,
       {
         method: "PATCH",
-        body: JSON.stringify({ xp, gold, domain }),
       },
     );
-
-    if (res?.quest) {
-      const prog = res.progression || {};
-      return {
-        ...res,
-        isCompleted: true,
-        xpAwarded: prog.xpAwarded ?? res.xpAwarded ?? xp,
-        bonusXp: prog.xpAwarded ? Math.max(0, prog.xpAwarded - (prog.baseXp || xp)) : (res.bonusXp || 0),
-        goldAwarded: res.goldAwarded ?? gold,
-        domainLeveledUp: Boolean(prog.leveledUp || res.domainLeveledUp),
-        overallLeveledUp: Boolean((prog.levelsGained > 0) || res.overallLeveledUp),
-        newDomainLevel: prog.newDomainLevel || res.newDomainLevel,
-        newOverallLevel: prog.newOverallLevel || res.newOverallLevel,
-        updatedUser: res.user || res.updatedUser,
-        quest: normalizeQuest(res.quest),
-        questCompleted: Boolean(res.questCompleted || isQuestFinished),
-      };
-    }
-
-    if (res?.user) {
-      return {
-        ...res,
-        updatedUser: res.user,
-      };
-    }
 
     if (res?.domainState) {
       return res;
@@ -389,14 +314,12 @@ class ApiService {
     // Update local quests
     const quests = storageService.getQuests();
     const updatedQuests = quests.map((q) => {
-      const qId = q.id ?? q._id;
-      if (qId !== questId) return q;
-      const updatedTasks = q.microtasks.map((m) => {
-        const mId = m.id ?? m._id;
-        return mId === microtaskId
+      if (q.id !== questId) return q;
+      const updatedTasks = q.microtasks.map((m) =>
+        m.id === microtaskId
           ? { ...m, isCompleted: true, completedAt: new Date().toISOString() }
-          : m;
-      });
+          : m,
+      );
       return {
         ...q,
         microtasks: updatedTasks,
@@ -428,7 +351,7 @@ class ApiService {
   // DELETE /api/quests/:id
   async deleteQuest(questId) {
     const res = await this.request(`/quests/${questId}`, { method: "DELETE" });
-    const quests = storageService.getQuests().filter((q) => (q.id ?? q._id) !== questId);
+    const quests = storageService.getQuests().filter((q) => q.id !== questId);
     storageService.saveQuests(quests);
     return res || { success: true };
   }
@@ -439,19 +362,11 @@ class ApiService {
   async decomposeTask({ task, domain, difficulty, motivationLevel }) {
     const res = await this.request("/ai/decompose", {
       method: "POST",
-      body: JSON.stringify({ description: task, task, domain, difficulty, motivationLevel }),
+      body: JSON.stringify({ task, domain, difficulty, motivationLevel }),
     });
 
-    if (res?.microtasks && Array.isArray(res.microtasks)) {
-      return {
-        ...res,
-        microtasks: res.microtasks.map((mt, i) => ({
-          ...mt,
-          id: mt.id || mt._id || `mt_${i + 1}_${Date.now()}`,
-          order: mt.order ?? i + 1,
-          isCompleted: Boolean(mt.isCompleted),
-        })),
-      };
+    if (res?.microtasks) {
+      return res;
     }
 
     // Local AI decomposition engine fallback
@@ -498,17 +413,8 @@ class ApiService {
       body: JSON.stringify({ feelingContext }),
     });
 
-    if (res?.groundingMicrotasks && Array.isArray(res.groundingMicrotasks)) {
-      return {
-        ...res,
-        groundingMicrotasks: res.groundingMicrotasks.map((task, i) => ({
-          ...task,
-          id: task.id || task._id || `grounding_${i + 1}`,
-          domain: task.domain || "mental",
-          xpReward: task.xpReward || 10,
-          goldReward: task.goldReward || 0,
-        })),
-      };
+    if (res?.groundingMicrotasks) {
+      return res;
     }
 
     // Local AI grounding generator fallback
@@ -520,10 +426,10 @@ class ApiService {
   // GET /api/daily-quests
   async getDailies() {
     const res = await this.request("/daily-quests");
-    if (res?.dailyQuests && Array.isArray(res.dailyQuests)) {
-      return res.dailyQuests.map(normalizeDailyQuest);
+    if (res?.dailyQuests) {
+      return res.dailyQuests;
     }
-    return storageService.getDailies().map(normalizeDailyQuest);
+    return storageService.getDailies();
   }
 
   // POST /api/daily-quests
@@ -534,45 +440,62 @@ class ApiService {
     });
 
     if (res?.dailyQuest) {
-      return normalizeDailyQuest(res.dailyQuest);
+      return res.dailyQuest;
     }
 
     const dailies = storageService.getDailies();
-    const normalized = normalizeDailyQuest(dailyData);
-    const updated = [...dailies, normalized];
+    const updated = [...dailies, dailyData];
     storageService.saveDailies(updated);
-    return normalized;
+    return dailyData;
   }
 
   // PATCH /api/daily-quests/:id/complete
-  async completeDaily(dailyId, user) {
+  // proofImage (optional): a base64 data URL ("data:image/png;base64,...").
+  // It's sent for one-time analysis on the server and is never stored —
+  // by us or by the backend — beyond this single request.
+  async completeDaily(dailyId, user, proofImage = null) {
     const res = await this.request(`/daily-quests/${dailyId}/complete`, {
       method: "PATCH",
+      body: JSON.stringify(proofImage ? { proofImage } : {}),
     });
 
-    if (res?.dailyQuest || res?.xpAwarded !== undefined || res?.progression || res?.user) {
-      const prog = res.progression || {};
-      const xpVal = res.xpAwarded ?? prog.xpAwarded ?? 25;
-      const goldVal = res.goldAwarded ?? res.dailyQuest?.goldReward ?? 10;
-      const bonusXp = res.bonusXp ?? (prog.baseXp ? Math.max(0, prog.xpAwarded - prog.baseXp) : 0);
-
+    if (res?.progression) {
       return {
         success: true,
-        xpAwarded: xpVal,
-        bonusXp,
-        goldAwarded: goldVal,
-        dailyQuest: res.dailyQuest ? normalizeDailyQuest(res.dailyQuest) : null,
-        updatedUser: res.updatedUser || res.user,
-        domainLeveledUp: Boolean(prog.leveledUp),
-        overallLeveledUp: Boolean(prog.levelsGained > 0),
-        newDomainLevel: prog.newDomainLevel,
-        newOverallLevel: prog.newOverallLevel,
+        xpAwarded: res.progression.xpAwarded,
+        bonusXp: Math.max(0, res.progression.xpAwarded - (res.dailyQuest?.xpReward || 0)),
+        goldAwarded: res.dailyQuest?.goldReward || 0,
+        updatedUser: res.user,
+        domainLeveledUp: res.progression.leveledUp,
+        overallLeveledUp: res.progression.leveledUp,
+        streakDays: res.dailyQuest?.streakDays,
+        proofDescription: res.proof?.description || null,
+        proofScore: res.proof?.score ?? null,
+        proofOverPerformancePercent: res.proof?.overPerformancePercent || 0,
+        // Full quest doc (includes the persisted lastProof) so the UI can
+        // merge it in and keep showing the AI verdict under the card.
+        updatedDaily: res.dailyQuest || null,
       };
     }
 
-    // Fallback
+    // A real rejection from the server (e.g. the photo didn't match the task)
+    // — status is present because the server responded, it just said no.
+    // This must NOT fall through to the offline fallback below, since that
+    // would silently complete the quest locally despite the rejection.
+    if (res?.status === 400) {
+      return {
+        success: false,
+        rejected: true,
+        error: res.error || "That didn't look right — try again.",
+        description: res.description || null,
+        score: res.score ?? null,
+      };
+    }
+
+    // Fallback (backend truly unreachable) — proof analysis needs the server,
+    // so a proof image just gets acknowledged locally without verification.
     const dailies = storageService.getDailies();
-    const target = dailies.find((d) => (d.id ?? d._id) === dailyId);
+    const target = dailies.find((d) => d.id === dailyId);
     if (!target) return null;
 
     target.isCompletedToday = true;
@@ -595,24 +518,8 @@ class ApiService {
       updatedUser: prog.updatedUser,
       domainLeveledUp: prog.domainLeveledUp,
       overallLeveledUp: prog.overallLeveledUp,
-      newDomainLevel: prog.newDomainLevel,
-      newOverallLevel: prog.newOverallLevel,
+      proofDescription: proofImage ? "Proof saved locally (offline mode)" : null,
     };
-  }
-
-  // DELETE /api/daily-quests/:id
-  async deleteDaily(dailyId) {
-    const res = await this.request(`/daily-quests/${dailyId}`, { method: "DELETE" });
-
-    if (res?.message || res?.success) {
-      return { success: true, message: res.message || "Daily quest deleted" };
-    }
-
-    const dailies = storageService.getDailies();
-    const filtered = dailies.filter((d) => (d.id ?? d._id) !== dailyId);
-    storageService.saveDailies(filtered);
-
-    return { success: true, message: "Daily quest deleted" };
   }
 
   /* ==================== 5. STORE & INVENTORY ==================== */
@@ -620,27 +527,21 @@ class ApiService {
   // GET /api/store/items
   async getStoreItems() {
     const res = await this.request("/store/items");
-    if (res?.items && Array.isArray(res.items)) {
-      return res.items.map(normalizeStoreItem);
+    if (res?.items) {
+      return res.items;
     }
-    return storageService.getStoreItems().map(normalizeStoreItem);
+    return storageService.getStoreItems();
   }
 
   // POST /api/store/buy
   async buyStoreItem(item, user) {
-    const itemId = item.id ?? item._id;
     const res = await this.request("/store/buy", {
       method: "POST",
-      body: JSON.stringify({ itemId }),
+      body: JSON.stringify({ itemId: item.id }),
     });
 
-    if (res?.success || res?.user) {
-      return {
-        success: true,
-        remainingGold: res.remainingGold ?? res.user?.character?.gold ?? user?.character?.gold,
-        updatedUser: res.updatedUser || res.user,
-        purchasedItem: res.purchasedItem || res.item || item,
-      };
+    if (res?.success) {
+      return res;
     }
 
     // Local fallback
@@ -652,14 +553,14 @@ class ApiService {
     updatedUser.character.gold = currentGold - item.costGold;
 
     const existingIndex = updatedUser.inventory.findIndex(
-      (inv) => inv.itemId === itemId,
+      (inv) => inv.itemId === item.id,
     );
     if (existingIndex >= 0) {
       updatedUser.inventory[existingIndex].quantity =
         (updatedUser.inventory[existingIndex].quantity || 1) + 1;
     } else {
       updatedUser.inventory.push({
-        itemId,
+        itemId: item.id,
         name: item.name,
         type: item.type,
         quantity: 1,
@@ -675,58 +576,19 @@ class ApiService {
     storageService.saveUser(updatedUser);
 
     return {
-  success: true,
-  remainingGold: updatedUser.character.gold,
-  updatedUser,
-  item,
-};
-  }
-  // POST /api/store/use/:itemId
-async useStoreItem(itemId) {
-  if (!itemId) {
-    return {
-      success: false,
-      error: "Invalid inventory item ID",
-    };
-  }
-
-  const res = await this.request(
-    `/store/use/${encodeURIComponent(itemId)}`,
-    {
-      method: "POST",
-    }
-  );
-
-  if (res?.user) {
-    return {
       success: true,
-      message: res.message || "Item used successfully",
-      effect: res.effect || null,
-      remainingQuantity: res.remainingQuantity ?? 0,
-      updatedUser: res.user,
+      remainingGold: updatedUser.character.gold,
+      updatedUser,
     };
   }
 
-  return {
-    success: false,
-    error: res?.error || "Unable to use item",
-  };
-}
   /* ==================== 6. STREAKS & ACTIVITY LOGS ==================== */
 
   // GET /api/streaks
   async getStreakData() {
     const res = await this.request("/streaks");
-    if (res?.currentStreak !== undefined || res?.streak || res?.recentDays) {
-      const streakObj = res.streak || {};
-      return {
-        currentStreak: res.currentStreak ?? streakObj.currentStreak ?? 1,
-        longestStreak: res.longestStreak ?? streakObj.longestStreak ?? 1,
-        multiplier: res.multiplier ?? getStreakMultiplier(streakObj.currentStreak || 1),
-        freezesAvailable: res.freezesAvailable ?? streakObj.streakFreezesAvailable ?? 0,
-        heatmap: res.heatmap || [],
-        recentDays: res.recentDays || res.heatmap || [],
-      };
+    if (res?.currentStreak !== undefined) {
+      return res;
     }
 
     const user = storageService.getUser();
@@ -735,8 +597,6 @@ async useStoreItem(itemId) {
       longestStreak: user.streak?.longestStreak || 1,
       multiplier: getStreakMultiplier(user.streak?.currentStreak || 1),
       freezesAvailable: user.streak?.streakFreezesAvailable || 1,
-      heatmap: [],
-      recentDays: [],
     };
   }
 

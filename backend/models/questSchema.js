@@ -13,7 +13,12 @@ const microtaskSchema = new Schema(
         isCompleted: { type: Boolean, default: false },
         completedAt: { type: Date, default: null },
     },
-    { timestamps: false }
+    {
+        timestamps: false,
+        // Subdocuments serialize with their own toJSON options, so this
+        // needs to be repeated here too for `microtask.id` to show up.
+        toJSON: { virtuals: true },
+    }
 );
 
 // ── Main Quest Schema ────────────────────────────────────────
@@ -57,7 +62,19 @@ const questSchema = new Schema(
         microtasks: [microtaskSchema],
         completedAt: { type: Date, default: null },
     },
-    { timestamps: true }
+    {
+        timestamps: true,
+        // Same fix as dailyQuestSchema: expose the `id` virtual in JSON so
+        // the frontend's `quest.id` / `microtask.id` lookups actually work
+        // instead of silently being undefined.
+        toJSON: {
+            virtuals: true,
+            transform: (_doc, ret) => {
+                delete ret.__v;
+                return ret;
+            },
+        },
+    }
 );
 
 // ── Indexes for common queries ───────────────────────────────

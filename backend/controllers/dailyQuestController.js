@@ -1,19 +1,13 @@
 import DailyQuest from "../models/dailyQuestSchema.js";
 import { awardXp, awardGold, updateStreak, logActivity } from "../services/progressionService.js";
+import { analyzeProofImage } from "./aiController.js";
 
-// Helper: "YYYY-MM-DD" for today / yesterday in the server's local timezone
-function toLocalDateKey(date = new Date()) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-}
-
+// Helper: "YYYY-MM-DD" for today / yesterday
 function todayStr() {
-    return toLocalDateKey(new Date());
+    return new Date().toISOString().slice(0, 10);
 }
 function yesterdayStr() {
-    return toLocalDateKey(new Date(Date.now() - 86400000));
+    return new Date(Date.now() - 86400000).toISOString().slice(0, 10);
 }
 
 // Resets isCompletedToday on a new day, and breaks streakDays back to 0
@@ -25,6 +19,7 @@ function applyDailyReset(daily) {
     }
 
     daily.isCompletedToday = false;
+    daily.lastProof = null; // yesterday's AI verdict shouldn't linger into today
 
     // If the last completion wasn't yesterday (or ever), the streak is broken
     if (daily.lastCompletedDate !== yesterdayStr()) {
@@ -109,15 +104,89 @@ export async function completeDailyQuest(req, res) {
             return res.status(400).json({ error: "Daily quest already completed today" });
         }
 
+        // ── Optional proof-of-completion photo ──
+        // The image (if any) is a base64 data URL that lives only in this
+        // request's memory. We send it to Gemini to check it's plausibly
+        // related to this habit and to read any measurable value it shows,
+        // keep just that result, and let the buffer be garbage-collected
+        // once this function returns — it is never written to disk or saved
+        // on the daily quest / user / activity log.
+        let proof = null;
+        let bonusXp = 0;
+        if (req.body?.proofImage) {
+            try {
+                const result = await analyzeProofImage(req.body.proofImage, daily.title);
+
+                if (!result.matches) {
+                    // Reject before anything is mutated or saved — no partial
+                    // completion, no reward, nothing written for a rejected photo.
+                    // Message = Gemini's own short read of the photo (the "why",
+                    // already capped at ~15 words) + a concrete suggestion of
+                    // what kind of screenshot WOULD count for this domain.
+                    const domainSuggestion = {
+                        health: "a Health app or Digital Wellbeing screenshot",
+                        mental: "a Screen Time or mindfulness app screenshot",
+                        skill: "an app screenshot showing your progress",
+                    }[daily.domain] || "a more relevant screenshot";
+
+                    return res.status(400).json({
+                        error: `${result.description} — try ${domainSuggestion} instead.`,
+                        code: "proof_mismatch",
+                        description: result.description,
+                        score: result.score,
+                    });
+                }
+
+                // Bonus XP has two components, summed and capped at +100% of
+                // the base reward:
+                //  1) A measurable-target bonus (e.g. ran 250m vs a 200m goal).
+                //  2) A quality bonus driven by Gemini's 1-10 conviction score
+                //     — a 5/10 (an ordinary, adequate photo) earns no extra,
+                //     scores above that scale up to +50% at a perfect 10.
+                const targetBonusPercent = result.overPerformancePercent;
+                const qualityBonusPercent = Math.max(0, result.score - 5) * 10; // 6→10%, 10→50%
+                const totalBonusPercent = Math.min(100, targetBonusPercent + qualityBonusPercent);
+                bonusXp = Math.round((daily.xpReward * totalBonusPercent) / 100);
+
+                proof = {
+                    submitted: true,
+                    description: result.description,
+                    source: "gemini",
+                    score: result.score,
+                    targetValue: result.targetValue,
+                    achievedValue: result.achievedValue,
+                    unit: result.unit,
+                    overPerformancePercent: result.overPerformancePercent,
+                    bonusXp,
+                };
+            } catch (err) {
+                console.warn("Proof image analysis unavailable:", err.message);
+                proof = { submitted: true, description: null, source: "unavailable" };
+            }
+        }
+
         const today = todayStr();
         daily.isCompletedToday = true;
         daily.streakDays += 1;
         daily.lastCompletedDate = today;
 
+        // Persist the verdict onto the quest itself (not just the activity
+        // log) so it keeps showing under the quest card after a refresh.
+        if (proof) {
+            daily.lastProof = {
+                description: proof.description,
+                matches: true,
+                score: proof.score ?? null,
+                bonusXp: proof.bonusXp || 0,
+                overPerformancePercent: proof.overPerformancePercent || 0,
+                verifiedAt: new Date(),
+            };
+        }
+
         // ── Award progression to the user (streak-multiplied) ──
         const user = req.user;
         const streakResult = updateStreak(user);
-        const xpResult = await awardXp(user, daily.domain, daily.xpReward);
+        const xpResult = await awardXp(user, daily.domain, daily.xpReward + bonusXp);
         awardGold(user, daily.goldReward);
 
         await Promise.all([daily.save(), user.save()]);
@@ -128,7 +197,12 @@ export async function completeDailyQuest(req, res) {
             domain: daily.domain,
             xpGained: xpResult.xpAwarded,
             goldGained: daily.goldReward,
-            metadata: { dailyQuestId: daily._id, title: daily.title, dailyStreak: daily.streakDays },
+            metadata: {
+                dailyQuestId: daily._id,
+                title: daily.title,
+                dailyStreak: daily.streakDays,
+                ...(proof ? { proof } : {}),
+            },
         });
 
         if (xpResult.leveledUp) {
@@ -146,19 +220,14 @@ export async function completeDailyQuest(req, res) {
         }
 
         return res.status(200).json({
-            success: true,
-            xpAwarded: xpResult.xpAwarded,
-            goldAwarded: daily.goldReward,
-            bonusXp: Math.max(0, xpResult.xpAwarded - daily.xpReward),
-            streakDays: daily.streakDays,
             dailyQuest: daily,
             progression: xpResult,
+            proof,
             streak: {
                 currentStreak: user.streak.currentStreak,
                 longestStreak: user.streak.longestStreak,
                 changed: streakResult.changed,
             },
-            updatedUser: user,
             user,
         });
     } catch (err) {

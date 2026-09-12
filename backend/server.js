@@ -12,7 +12,6 @@ import authRoutes from "./routes/authRoutes.js";
 import dailyQuestRoutes from "./routes/dailyQuestRoutes.js";
 import storeRoutes from "./routes/storeRoutes.js";
 import streakRoutes from "./routes/streakRoutes.js";
-import activityLogRoutes from "./routes/activityLogRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import { protect } from "./middleware/authMiddleware.js";
 import { attachSarvamSttProxy } from "./services/sarvamSttProxy.js";
@@ -32,38 +31,35 @@ await connectDB();
 
 
 const allowedOrigins = [
-  process.env.FRONTEND_URL,
   "http://localhost:3000",
-  "http://127.0.0.1:3000",
   "http://localhost:5173",
-  "http://127.0.0.1:5173",
-].filter(Boolean);
+  "https://life-rpg-three-psi.vercel.app",
+  ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim()) : []),
+];
 
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
-      return callback(null, true);
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
     }
-    if (process.env.NODE_ENV !== "production" && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-      return callback(null, true);
-    }
-    return callback(null, true);
   },
   credentials: true,
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Raised from the default 100kb so a base64-encoded proof-of-completion photo
+// (~4-6MB typical phone screenshot) fits in a single request body.
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
 
 app.use("/api/auth", authRoutes);
-app.use("/api/users", authRoutes);
 app.use("/api/quests", protect, questRoutes);
 app.use("/api/daily-quests", protect, dailyQuestRoutes);
 app.use("/api/store", protect, storeRoutes);
 app.use("/api/streaks", protect, streakRoutes);
-app.use("/api/activity-logs", protect, activityLogRoutes);
 app.use("/api/ai", protect, aiRoutes);
 
 

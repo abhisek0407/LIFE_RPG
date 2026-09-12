@@ -7,6 +7,7 @@ import StreakCalendarView from "./components/StreakCalendarView";
 import DailyQuestsView from "./components/DailyQuestsView";
 import StoreView from "./components/StoreView";
 import ActiveQuestsView from "./components/ActiveQuestsView";
+import PersonaAvatarView from "./components/PersonaAvatarView";
 import QuestDecompositionModal from "./components/QuestDecompositionModal";
 import FeelStuckModal from "./components/FeelStuckModal";
 import LevelUpModal from "./components/LevelUpModal";
@@ -230,8 +231,7 @@ export default function App() {
   // Automatic dopamine streak popup on login / session visit
   const [isStreakModalOpen, setIsStreakModalOpen] = useState(() => {
     try {
-      const date = new Date();
-      const today = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      const today = new Date().toISOString().split("T")[0];
       const lastShown = sessionStorage.getItem("lrpg_streak_popup_shown");
       if (lastShown === today) return false;
       sessionStorage.setItem("lrpg_streak_popup_shown", today);
@@ -247,7 +247,7 @@ export default function App() {
     async function loadData() {
       try {
         const [questsData, dailiesData, storeData] = await Promise.all([
-          apiService.getQuests("all"),
+          apiService.getQuests(),
           apiService.getDailies(),
           apiService.getStoreItems(),
         ]);
@@ -285,8 +285,8 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  const showFeedback = ({ xp, domainName, bonusXp = 0, gold }) => {
-    setFloatingFeedback({ xp, domainName, bonusXp, gold });
+  const showFeedback = ({ xp, domainName, bonusXp = 0, gold, note = null }) => {
+    setFloatingFeedback({ xp, domainName, bonusXp, gold, note });
     setTimeout(() => {
       setFloatingFeedback(null);
     }, 3200);
@@ -364,7 +364,6 @@ export default function App() {
 
         return {
           ...quest,
-          id: questKey,
           microtasks: updatedTasks,
           earnedXp: (quest.earnedXp || 0) + xp,
           earnedGold: (quest.earnedGold || 0) + gold,
@@ -471,8 +470,13 @@ export default function App() {
     }
   };
 
-  const handleToggleDaily = async (daily) => {
-    if (daily.isCompletedToday) return;
+  // proofImage (optional): base64 data URL from an attached photo. When one is
+  // passed, we wait for the server to actually verify it before marking the
+  // quest complete — a mismatched photo is rejected with nothing changed.
+  // Without a photo, the tick is instant (nothing to verify, safe to fall
+  // back locally if the server's unreachable).
+  const handleToggleDaily = async (daily, proofImage = null) => {
+    if (daily.isCompletedToday) return null;
 
     setDailies((prev) =>
       prev.map((d) =>
@@ -486,17 +490,53 @@ export default function App() {
       ),
     );
 
-    const result = await apiService.completeDaily(daily.id, user);
+    const result = await apiService.completeDaily(daily.id, user, proofImage);
+
+    if (result?.rejected) {
+      // Nothing changed server-side — DailyQuestsView shows the reason as a
+      // banner right under the quest card (not a corner toast, so it doesn't
+      // get missed / doesn't need to compete with the XP toast timing).
+      return result;
+    }
+
+    if (proofImage) {
+      // Only mark complete now that the server has actually confirmed it.
+      // Merge in the persisted server quest (includes lastProof: Gemini's
+      // description + 1-10 score) so it keeps showing under the card, not
+      // just in the one-time toast below.
+      setDailies((prev) =>
+        prev.map((d) =>
+          d.id === daily.id
+            ? {
+              ...d,
+              ...(result?.updatedDaily || {}),
+              isCompletedToday: true,
+              streakDays: result?.updatedDaily?.streakDays ?? (d.streakDays || 0) + 1,
+            }
+            : d,
+        ),
+      );
+    }
+
     if (result?.updatedUser) {
       setUser(normalizeUserForUi(result.updatedUser));
     }
 
     const domainName = DOMAINS[daily.domain]?.name || "XP";
+    const overPerf = result?.proofOverPerformancePercent || 0;
+    const score = result?.proofScore;
     showFeedback({
       xp: result.xpAwarded || daily.xpReward,
       domainName,
       bonusXp: result.bonusXp || 0,
       gold: result.goldAwarded || daily.goldReward,
+      note: [
+        result.proofDescription,
+        Number.isFinite(score) ? `AI score: ${score}/10` : null,
+        overPerf > 0 ? `+${overPerf}% over target!` : null,
+      ]
+        .filter(Boolean)
+        .join(" — ") || null,
     });
   };
   const handleAddDaily = async (newDaily) => {
@@ -667,6 +707,7 @@ export default function App() {
           soundEnabled={soundEnabled}
           setSoundEnabled={setSoundEnabled}
           onOpenStreakModal={() => setIsStreakModalOpen(true)}
+          onOpenPersonaTab={() => setActiveTab("persona")}
           onOpenProfile={() => setActiveTab("profile")}
         />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-6xl w-full mx-auto space-y-8">
@@ -697,6 +738,14 @@ export default function App() {
             />
           )}
 
+          {activeTab === "persona" && (
+            <PersonaAvatarView
+              user={user}
+              onUpdateUser={(updated) => setUser(updated)}
+              onShowFeedback={showFeedback}
+            />
+          )}
+
           {activeTab === "streak" && (
             <StreakCalendarView
               user={user}
@@ -709,7 +758,6 @@ export default function App() {
               dailies={dailies}
               onToggleDaily={handleToggleDaily}
               onAddDaily={handleAddDaily}
-              onDeleteDaily={handleDeleteDaily}
             />
           )}
 
@@ -718,7 +766,6 @@ export default function App() {
               user={user}
               storeItems={storeItems}
               onBuyItem={handleBuyItem}
-              onUseItem={handleUseItem}
             />
           )}
           {activeTab === "profile" && (
