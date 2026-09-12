@@ -1,124 +1,243 @@
-# Life RPG // Turn Tasks into Quests
+<div align="center">
 
-> **Bridge the Delayed Gratification Gap.** Transform mundane, overwhelming real-world responsibilities into rewarding RPG quests with tactile dopamine micro-interactions, AI-driven microtask decomposition, physiological grounding unblockers, and a non-linear character progression engine.
+# ⚔️ Life RPG
+### Turn your to-do list into a quest log.
 
----
+**Real tasks. Real habits. Real XP.** An AI-powered gamification engine that breaks overwhelming goals into tiny dopamine-friendly steps — with voice input, streaks, a loot store, and photo proof-of-completion.
 
-## 🌟 The Philosophy & Design Direction
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
+[![TailwindCSS](https://img.shields.io/badge/Tailwind-3-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![Node.js](https://img.shields.io/badge/Node.js-Express%205-339933?logo=node.js&logoColor=white)](https://expressjs.com)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com)
+[![Gemini](https://img.shields.io/badge/Gemini_AI-Quest_Engine-8E75B2?logo=google-gemini&logoColor=white)](https://ai.google.dev)
+[![Sarvam AI](https://img.shields.io/badge/Sarvam_AI-Realtime_Voice-FF6B35)](https://sarvam.ai)
+[![Deployed on Render](https://img.shields.io/badge/Backend-Render-46E3B7?logo=render&logoColor=white)](https://render.com)
+[![Deployed on Vercel](https://img.shields.io/badge/Frontend-Vercel-000000?logo=vercel&logoColor=white)](https://vercel.com)
+[![License](https://img.shields.io/badge/License-MIT-informational)](#-license)
 
-Traditional productivity apps feel like chores because the real-world rewards of going to the gym, studying operating systems, or cleaning an apartment take weeks or months to materialize.
+[**Live App**](https://life-rpg-three-psi.vercel.app/) · [Report a Bug](https://github.com/abhisek0407/LIFE_RPG/issues) · [Request a Feature](https://github.com/abhisek0407/LIFE_RPG/issues)
 
-**Life RPG** bridges this gap by giving immediate feedback:
-- **Immediate Dopamine**: Checking off even the smallest 2-minute starter step triggers visual confetti, procedural 8-bit sound chimes, floating XP numbers, and in-game gold.
-- **Micro-Steps Beat Paralysis**: Instead of staring at an overwhelming monster task, the **AI Quest Engine** automatically breaks down the goal based on your **Motivation Level** (Low, Medium, High). Low motivation triggers ultra-gentle microsteps to bypass executive dysfunction.
-- **Emergency "Feel Stuck" Chamber**: When cognitive overload or anxiety sets in, the Feel Stuck button provides somatic box-breathing (4-4-4-4) and 3 instant grounding actions to unfreeze your focus.
-- **Three Core Pillars of Progression**:
-  - 🧠 **Mental XP**: Focus, study blocks, intellect, and problem-solving.
-  - 💪 **Health XP**: Physical constitution, gym workouts, nutrition, and hydration.
-  - ✨ **Skill / Personality XP**: Coding mastery, creative craft, reading, and social charisma.
-
----
-
-## 📐 Architecture & Layout (Wireframe Alignment)
-
-The frontend interface strictly mirrors the hand-drawn layout specification:
-1. **Sidebar Navigation**:
-   - `Home`: Main quest dashboard & AI task decomposition
-   - `Streak Calendar`: Consistency multiplier matrix & daily check-in
-   - `Daily Quests`: Recurring daily rituals & habit streaks
-   - `Store & Armory`: Virtual items, XP potions, streak freezes, and cosmetic titles
-2. **Top Stats Bar**:
-   - 3 Domain XP Gauges (**Mental XP**, **Health XP**, **Skill XP**) with level badges and live progress bars.
-   - Gold Balance & Streak Multiplier (+5% bonus per streak day, up to 1.50x).
-   - Audio synthesizer toggle (Procedural Web Audio API sound effects).
-3. **Hero Interface**:
-   - Dynamic greeting: `Hi, [Username]`
-   - Core prompt: `What's overwhelming you today?`
-   - Tactile search / input bar with quick suggested starters.
-   - `Feel Stuck` prominent unblocker button directly below the search bar.
-4. **Quest Decomposition Forge (Modal)**:
-   - Autofilled Task Name
-   - Domain Selector (Health, Mental, Skill/Personality)
-   - Difficulty Selector (Easy, Medium, Hard)
-   - Motivation Level (Low, Medium, High)
-   - "Generate Micro-Tasks" button
-   - Interactive checklist with XP and Gold rewards per step
-   - `+ Add Custom Microtask` field to seamlessly add personal steps to the AI-generated list
-   - "Accept Quest" to transfer into your Active Quest Log.
+</div>
 
 ---
 
-## 📊 Complete API Contracts & Database Schemas
+## 🧭 Table of Contents
 
-To ensure 100% consistency between this React frontend and the Node.js + Express + MongoDB backend, see:
-[`api_contracts_and_schema.json`](./api_contracts_and_schema.json)
+- [Why Life RPG](#-why-life-rpg)
+- [Features](#-features)
+- [Tech Stack](#-tech-stack)
+- [Architecture](#-architecture)
+- [Getting Started](#-getting-started)
+- [Environment Variables](#-environment-variables)
+- [Core Gamification Rules](#-core-gamification-rules)
+- [API Reference](#-api-reference)
+- [Deployment](#-deployment)
+- [Roadmap](#-roadmap)
 
-### Key Database Models (Mongoose / MongoDB)
-- `User`: Account, credentials hash, character title, level, gold, streak, and domain stats (`mental`, `health`, `skill`).
-- `Quest`: User ID, title, domain, difficulty, motivation level, status (`active`, `completed`), total XP, total Gold, and `microtasks` sub-documents.
-- `DailyQuest`: Recurring daily habits, streak days, last completed date, XP/gold rewards.
-- `StoreItem` & `Inventory`: Consumables, streak freezes, cosmetic badges, titles, and themes.
-- `ActivityLog`: Comprehensive audit trail of all task completions, XP gains, and purchases for anti-cheat verification.
+---
 
-### Non-Linear Leveling Formula
-$$\text{XP Required for Level } L = \lfloor 100 \times L^{1.5} \rfloor$$
+## 💡 Why Life RPG
+
+Traditional productivity apps feel like chores because the real-world payoff of going to the gym, finishing a degree, or cleaning an apartment takes weeks to materialize. Your brain doesn't wait that long for a reward signal — so it gives up first.
+
+**Life RPG closes that gap.** Every real action — no matter how small — pays out immediately: XP ticks up, gold drops, a streak flame grows, and your character levels up in front of you. The overwhelming task never has to feel finished to feel *rewarded*.
+
+- 🎉 **Immediate Dopamine** — confetti, 8-bit procedural sound chimes, and floating XP/gold numbers on every single micro-action.
+- 🧩 **Micro-Steps Beat Paralysis** — an AI Quest Engine decomposes any goal into 4–6 concrete steps, tuned to your stated motivation level (Low / Medium / High).
+- 🧘 **"Feel Stuck" Emergency Chamber** — one tap gives you box-breathing (4-4-4-4) plus 3 tiny grounding actions to unfreeze executive dysfunction.
+- 🗣️ **Talk instead of type** — speak your task out loud in *any language* and the AI titles, categorizes, and decomposes it for you.
+
+---
+
+## ✨ Features
+
+### 🎯 AI Quest Decomposition
+Describe a task, pick a domain and difficulty, and Gemini breaks it into concrete microtasks with individually-tuned XP/Gold rewards. If the AI is unreachable, a deterministic rule-based engine kicks in automatically — the app never blocks on AI availability.
+
+### 🎙️ Realtime Multilingual Voice Input
+Tap the mic and just talk. Audio streams live over WebSockets to **Sarvam AI's** realtime speech-to-text (auto language detection — Hindi, Odia, English, and more), and the transcript is handed straight to Gemini, which infers the task title, domain, *and* generates the microtask breakdown in a single round trip. Your API keys never touch the browser — everything is proxied through the authenticated backend.
+
+### 📆 Daily Ritual Quests + Photo Proof
+Recurring daily habits with their own streak counters. Attach a photo when you complete one (workout screenshot, a photo of your desk, whatever proves it) — the image is analyzed once for a short description shown in your reward toast, then **immediately discarded**. It's never written to disk or stored in the database; only the description text is logged.
+
+### 🔥 Streaks & Activity Heatmap
+A 30-day activity heatmap (built from an aggregated audit log) plus a streak multiplier that adds +5% bonus XP per consecutive active day, up to +50% at 10 days. Streak Freeze items protect your flame if life gets in the way.
+
+### 🏪 Store & Inventory
+Spend gold on XP potions, streak freezes, cosmetic titles, and themes. Full inventory system backed by MongoDB.
+
+### 🧘 "I Feel Stuck" Grounding Mode
+A dedicated support flow: an AI-generated (or fallback static) breathing exercise plus 3 sub-2-minute grounding microtasks, for the moments a task feels too big to start.
+
+### 📊 Non-Linear Character Progression
+Three independent domains — **Mental**, **Health**, and **Skill/Personality** — each leveling on a non-linear curve, so growth always feels earned:
+
+$$\text{XP required for Level } L = \lfloor 100 \times L^{1.5} \rfloor$$
+
+### 🛡️ Server-Authoritative Everything
+XP, gold, and levels are computed and persisted entirely server-side via JWT-authenticated endpoints — the client can't spoof rewards. A comprehensive `ActivityLog` audit trail backs every completion, purchase, and level-up.
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|---|---|
+| **Frontend** | React 18 · Vite · Tailwind CSS · Lucide Icons · canvas-confetti |
+| **Backend** | Node.js · Express 5 · Mongoose (MongoDB) · JWT Auth · WebSockets (`ws`) |
+| **AI Engine** | Google Gemini (task decomposition, voice-to-quest, feel-stuck guide, proof-image analysis) |
+| **Voice** | Sarvam AI realtime STT, proxied over an authenticated WebSocket |
+| **Deployment** | Render (backend) · Vercel (frontend) |
+
+---
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart LR
+    subgraph Client["🖥️ React + Vite (Vercel)"]
+        UI[App UI]
+        Mic[🎙️ Voice Recorder]
+        API[apiService.js]
+    end
+
+    subgraph Server["⚙️ Express API (Render)"]
+        Auth[JWT Auth Middleware]
+        Routes[Quests · Dailies · Store · Streaks · AI]
+        WS[WebSocket STT Proxy]
+    end
+
+    subgraph External["☁️ External AI"]
+        Gemini[Google Gemini]
+        Sarvam[Sarvam AI Realtime STT]
+    end
+
+    DB[(MongoDB)]
+
+    UI --> API --> Auth --> Routes --> DB
+    Routes -- decompose / feel-stuck / proof analysis --> Gemini
+    Mic == PCM16 audio over WSS ==> WS == proxied ==> Sarvam
+    Sarvam -- transcript --> WS --> UI
+```
+
+A local-storage fallback layer (`storageService.js`) lets the frontend keep working in an offline/demo mode if the backend is ever unreachable, mirroring the same reward math client-side.
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js v18+ (tested on Node v24)
+- Node.js v18+
 - npm v9+
+- A MongoDB connection string (local or [MongoDB Atlas](https://www.mongodb.com/atlas))
+- A [Google Gemini API key](https://ai.google.dev)
+- *(Optional, for voice input)* a [Sarvam AI](https://sarvam.ai) API key
 
-### Installation
+### 1. Clone the repository
+```bash
+git clone https://github.com/abhisek0407/LIFE_RPG.git
+cd LIFE_RPG
+```
 
-1. **Clone the repository**:
-   ```bash
-   git clone <REPO_URL>
-   cd LRPG
-   ```
+### 2. Backend setup
+```bash
+cd backend
+npm install
+cp .env.example .env   # then fill in your real values — see table below
+npm run dev             # starts on http://localhost:5000
+```
 
-2. **Run Frontend**:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
-   The application will be running at `http://localhost:3000`.
+### 3. Frontend setup
+```bash
+cd frontend
+npm install
+npm run dev              # starts on http://localhost:5173 (or :3000, per Vite config)
+```
 
-3. **Build for Production**:
-   ```bash
-   npm run build
-   ```
+### 4. Build for production
+```bash
+cd frontend && npm run build
+```
 
 ---
 
-## ⚙️ Environment Variables Template (`.env.example`)
+## 🔐 Environment Variables
 
-Create a `.env` file in `frontend/` (and later `backend/`):
+### `backend/.env`
 
-```env
-# Frontend Environment
-VITE_API_BASE_URL=http://localhost:5000/api
-VITE_ENABLE_SOUND=true
+| Variable | Required | Description |
+|---|:---:|---|
+| `MONGODB_URI` | ✅ | MongoDB connection string |
+| `JWT_SECRET` | ✅ | Long random string used to sign auth tokens — generate your own, never reuse an example value |
+| `PORT` | – | Defaults to `5000` (Render sets this automatically in production) |
+| `GEMINI_API_KEY` | ✅ | Powers task decomposition, voice-to-quest, feel-stuck guidance, and proof-photo analysis |
+| `GEMINI_MODEL` | – | Defaults to `gemini-2.0-flash` |
+| `CORS_ORIGIN` | – | Comma-separated list of extra allowed frontend origins, on top of the ones hardcoded in `server.js` |
+| `SARVAM_API_KEY` | – | Enables realtime voice input; the app degrades gracefully without it |
+| `SARVAM_STT_WS_URL` / `SARVAM_STT_LANGUAGE_CODE` / `SARVAM_STT_MODEL` / `SARVAM_STT_SAMPLE_RATE` | – | Sarvam STT tuning, sensible defaults provided |
 
-# Backend Environment (for Node.js + Express)
-PORT=5000
-MONGODB_URI=mongodb://localhost:27017/liferpg
-JWT_SECRET=super_secret_jwt_key_rpg_2026
-CORS_ORIGIN=http://localhost:3000
-```
+### `frontend/.env`
+
+| Variable | Required | Description |
+|---|:---:|---|
+| `VITE_API_BASE_URL` | ✅ | Your backend's base URL, e.g. `https://your-service.onrender.com/api` |
+| `VITE_ENABLE_SOUND` | – | `true`/`false` — toggles the procedural sound engine |
 
 ---
 
 ## 🏆 Core Gamification Rules
 
-| Difficulty | Base XP | Base Gold | Multiplier Scaling |
-| :--- | :---: | :---: | :--- |
-| **Easy** | 50 XP | 15 Gold | Distributed among 3–4 micro-steps |
-| **Medium** | 120 XP | 35 Gold | Distributed among 4–5 micro-steps |
-| **Hard** | 300 XP | 80 Gold | Distributed among 5–6 micro-steps |
+| Difficulty | Base XP | Base Gold | Microtask Spread |
+|---|---|---|---|
+| **Easy** | 50 XP | 15 Gold | 3–4 steps |
+| **Medium** | 120 XP | 35 Gold | 4–5 steps |
+| **Hard** | 300 XP | 80 Gold | 5–6 steps |
 
-- **Streak Bonus**: Adds $+5\%$ bonus XP per consecutive active day up to $+50\%$ ($1.50\times$) at 10 days.
-- **Phoenix Feather**: Protects your streak fire if an unforeseen event forces you to miss a day.
+- **Streak bonus:** +5% XP per consecutive active day, capped at +50% (1.5×) at 10 days.
+- **Phoenix Feather:** a store item that protects your streak if you miss a day.
+- **Non-linear leveling:** `XP(L) = ⌊100 × L^1.5⌋` — each level demands meaningfully more than the last.
+
+---
+
+## 📡 API Reference
+
+Full request/response contracts and Mongoose schemas live in [`api_contracts_and_schema.json`](./api_contracts_and_schema.json) — the single source of truth kept in sync between frontend and backend.
+
+| Domain | Base Path |
+|---|---|
+| Auth | `/api/auth` |
+| Quests & Microtasks | `/api/quests` |
+| Daily Rituals | `/api/daily-quests` |
+| Store & Inventory | `/api/store` |
+| Streaks & Heatmap | `/api/streaks` |
+| AI (decompose / voice / feel-stuck) | `/api/ai` |
+| Voice STT | `wss://<host>/ws/stt?token=<jwt>` |
+
+---
+
+## ☁️ Deployment
+
+This project runs as two independently deployed services:
+
+- **Backend → [Render](https://render.com)** — Node web service, root directory `backend`, build `npm install`, start `npm start`. Set all backend env vars above in Render's dashboard.
+- **Frontend → [Vercel](https://vercel.com)** — set `VITE_API_BASE_URL` to your Render backend URL and redeploy.
+
+> ⚠️ Whenever you deploy the frontend to a new domain, add that exact origin to `allowedOrigins` in `backend/server.js` (or via the `CORS_ORIGIN` env var) — otherwise the API will reject its requests.
+
+---
+
+## 🗺️ Roadmap
+
+- [ ] Social / friend leaderboards
+- [ ] Native mobile wrapper
+- [ ] Configurable habit reminders / push notifications
+- [ ] Optional native health-app integrations (Google Fit / Apple Health) as an alternative to manual proof photos
+
+---
+
+<div align="center">
+
+**Built to make real life feel a little more like a game worth playing.**
+
+</div>
