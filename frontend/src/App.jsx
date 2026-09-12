@@ -316,11 +316,28 @@ export default function App() {
   };
 
   const handleBuyItem = async (item) => {
+  try {
     const result = await apiService.buyStoreItem(item, user);
-    if (result?.updatedUser) {
+
+    if (result?.success && result?.updatedUser) {
       setUser(result.updatedUser);
+      return true;
     }
-  };
+
+    console.error("Store purchase failed:", result);
+
+    alert(
+      result?.error ||
+        "Purchase failed. Please check the backend server."
+    );
+
+    return false;
+  } catch (error) {
+    console.error("Store purchase error:", error);
+    alert("Unable to complete purchase.");
+    return false;
+  }
+};
   const handleUseItem = async (item) => {
     const itemId = item.itemId || item._id;
 

@@ -10,6 +10,20 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
 class ApiService {
+  normalizeQuest(quest) {
+  if (!quest) return quest;
+
+  return {
+    ...quest,
+
+    id: quest.id || quest._id,
+
+    microtasks: (quest.microtasks || []).map((microtask) => ({
+      ...microtask,
+      id: microtask.id || microtask._id,
+    })),
+  };
+}
   constructor() {
     this.token =
       typeof window !== "undefined"
@@ -255,12 +269,16 @@ class ApiService {
 
   // GET /api/quests?status=active
   async getQuests(status = "active") {
-    const res = await this.request(`/quests?status=${status}`);
-    if (res?.quests) {
-      return res.quests;
-    }
-    return storageService.getQuests();
+  const res = await this.request(`/quests?status=${status}`);
+
+  if (res?.quests) {
+    return res.quests.map((quest) =>
+      this.normalizeQuest(quest)
+    );
   }
+
+  return storageService.getQuests();
+}
 
   // POST /api/quests
   async createQuest(questData) {
@@ -270,7 +288,7 @@ class ApiService {
     });
 
     if (res?.quest) {
-      return res.quest;
+      return this.normalizeQuest(res.quest);
     }
 
     // Local fallback

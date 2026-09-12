@@ -9,37 +9,27 @@ export default function StoreView({ user, storeItems, onBuyItem, onUseItem }) {
   const userGems = user.character?.gems || 0;
   const inventory = user.inventory || [];
 
-  const handleBuy = (item) => {
-    const costGold = item.costGold || 0;
-    const costGems = item.costGems || 0;
+  const handleBuy = async (item) => {
+  const costGold = item.costGold || 0;
+  const costGems = item.costGems || 0;
 
-    if (userGold < costGold || userGems < costGems) {
-      const missing = [];
+  if (userGold < costGold || userGems < costGems) {
+    const missing = [];
 
-      if (userGold < costGold) {
-        missing.push(`${costGold} Gold (you have ${userGold})`);
-      }
-
-      if (userGems < costGems) {
-        missing.push(`${costGems} Gems (you have ${userGems})`);
-      }
-
-      alert(`Not enough currency! You need ${missing.join(" and ")}.`);
-      return;
+    if (userGold < costGold) {
+      missing.push(`${costGold} Gold (you have ${userGold})`);
     }
 
-    soundService.playCoin();
+    if (userGems < costGems) {
+      missing.push(`${costGems} Gems (you have ${userGems})`);
+    }
 
-    try {
-      confetti({
-        particleCount: 40,
-        spread: 60,
-        origin: { y: 0.6 },
-      });
-    } catch (e) {}
+    alert(`Not enough currency! You need ${missing.join(" and ")}.`);
+    return;
+  }
 
-    onBuyItem(item);
-  };
+  await onBuyItem(item);
+};
 
   const getRarityBadge = (rarity) => {
     switch (rarity) {
