@@ -248,10 +248,7 @@ class ApiService {
       return res.user;
     }
 
-    const current = storageService.getUser();
-    const merged = { ...current, ...updates };
-    storageService.saveUser(merged);
-    return merged;
+    throw new Error(res?.error || "Unable to update profile");
   }
 
   /* ==================== 2. QUESTS & MICROTASKS ==================== */

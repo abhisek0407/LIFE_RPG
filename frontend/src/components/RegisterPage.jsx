@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Image } from "lucide-react";
 import {
   User,
   Mail,
@@ -11,13 +12,11 @@ import {
 } from "lucide-react";
 import { apiService } from "../services/apiService";
 
-export default function RegisterPage({
-  onRegister,
-  onSwitchToLogin,
-}) {
+export default function RegisterPage({ onRegister, onSwitchToLogin }) {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [profilePic, setProfilePic] = useState("");
   const [gender, setGender] = useState("");
   const [age, setAge] = useState("");
   const [password, setPassword] = useState("");
@@ -71,7 +70,7 @@ export default function RegisterPage({
         gender,
         age: Number(age),
         password,
-        profilePic: null,
+       profilePic: profilePic.trim() || null,
       });
 
       console.log("Registration result:", result);
@@ -93,7 +92,6 @@ export default function RegisterPage({
   return (
     <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
-
         <div className="text-center mb-8">
           <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 via-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 mb-5">
             <Sparkles className="w-8 h-8" />
@@ -109,7 +107,6 @@ export default function RegisterPage({
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
-
           <button
             type="button"
             onClick={onSwitchToLogin}
@@ -119,9 +116,7 @@ export default function RegisterPage({
             Back to sign in
           </button>
 
-          <h2 className="text-xl font-semibold mb-6">
-            Create account
-          </h2>
+          <h2 className="text-xl font-semibold mb-6">Create account</h2>
 
           {error && (
             <div className="mb-5 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
@@ -130,7 +125,28 @@ export default function RegisterPage({
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm text-slate-300 mb-2">
+                Profile picture URL{" "}
+                <span className="text-slate-500">(optional)</span>
+              </label>
 
+              <div className="relative">
+                <Image className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+
+                <input
+                  type="url"
+                  value={profilePic}
+                  onChange={(e) => setProfilePic(e.target.value)}
+                  placeholder="https://example.com/avatar.jpg"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl py-3 pl-11 pr-4 outline-none focus:border-cyan-400 transition"
+                />
+              </div>
+
+              <p className="text-xs text-slate-500 mt-1.5">
+                Optional. You can also add it later from Profile Settings.
+              </p>
+            </div>
             <div>
               <label className="block text-sm text-slate-300 mb-2">
                 Full name
@@ -164,9 +180,7 @@ export default function RegisterPage({
             </div>
 
             <div>
-              <label className="block text-sm text-slate-300 mb-2">
-                Email
-              </label>
+              <label className="block text-sm text-slate-300 mb-2">Email</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                 <input
@@ -180,7 +194,6 @@ export default function RegisterPage({
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-
               <div>
                 <label className="block text-sm text-slate-300 mb-2">
                   Gender
@@ -195,16 +208,12 @@ export default function RegisterPage({
                   <option value="male">Male</option>
                   <option value="female">Female</option>
                   <option value="non-binary">Non-binary</option>
-                  <option value="prefer_not_to_say">
-                    Prefer not to say
-                  </option>
+                  <option value="prefer_not_to_say">Prefer not to say</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm text-slate-300 mb-2">
-                  Age
-                </label>
+                <label className="block text-sm text-slate-300 mb-2">Age</label>
 
                 <input
                   type="number"
@@ -216,7 +225,6 @@ export default function RegisterPage({
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl py-3 px-3 outline-none focus:border-cyan-400 transition"
                 />
               </div>
-
             </div>
 
             <div>
@@ -267,9 +275,7 @@ export default function RegisterPage({
 
                 <button
                   type="button"
-                  onClick={() =>
-                    setShowConfirmPassword((v) => !v)
-                  }
+                  onClick={() => setShowConfirmPassword((v) => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
                 >
                   {showConfirmPassword ? (
@@ -289,7 +295,6 @@ export default function RegisterPage({
               <UserPlus className="w-5 h-5" />
               {loading ? "Creating account..." : "Create account"}
             </button>
-
           </form>
 
           <div className="mt-6 text-center">
@@ -305,7 +310,6 @@ export default function RegisterPage({
               Sign in
             </button>
           </div>
-
         </div>
       </div>
     </div>
