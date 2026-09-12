@@ -46,6 +46,20 @@ const normalizeStoreItem = (item = {}) => ({
 });
 
 class ApiService {
+  normalizeQuest(quest) {
+  if (!quest) return quest;
+
+  return {
+    ...quest,
+
+    id: quest.id || quest._id,
+
+    microtasks: (quest.microtasks || []).map((microtask) => ({
+      ...microtask,
+      id: microtask.id || microtask._id,
+    })),
+  };
+}
   constructor() {
     this.token =
       typeof window !== "undefined"
@@ -307,6 +321,7 @@ class ApiService {
 
     if (res?.quest) {
       return normalizeQuest(res.quest);
+      return this.normalizeQuest(res.quest);
     }
 
     // Local fallback
@@ -627,12 +642,43 @@ class ApiService {
     storageService.saveUser(updatedUser);
 
     return {
-      success: true,
-      remainingGold: updatedUser.character.gold,
-      updatedUser,
+  success: true,
+  remainingGold: updatedUser.character.gold,
+  updatedUser,
+  item,
+};
+  }
+  // POST /api/store/use/:itemId
+async useStoreItem(itemId) {
+  if (!itemId) {
+    return {
+      success: false,
+      error: "Invalid inventory item ID",
     };
   }
 
+  const res = await this.request(
+    `/store/use/${encodeURIComponent(itemId)}`,
+    {
+      method: "POST",
+    }
+  );
+
+  if (res?.user) {
+    return {
+      success: true,
+      message: res.message || "Item used successfully",
+      effect: res.effect || null,
+      remainingQuantity: res.remainingQuantity ?? 0,
+      updatedUser: res.user,
+    };
+  }
+
+  return {
+    success: false,
+    error: res?.error || "Unable to use item",
+  };
+}
   /* ==================== 6. STREAKS & ACTIVITY LOGS ==================== */
 
   // GET /api/streaks
