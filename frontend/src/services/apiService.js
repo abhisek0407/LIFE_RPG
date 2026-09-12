@@ -575,9 +575,7 @@ class ApiService {
     if (res?.items && Array.isArray(res.items)) {
       return res.items.map(normalizeStoreItem);
     }
-    return storageService.getStoreItems().map((item) =>
-        this.normalizeStoreItem(item)
-    );
+    return storageService.getStoreItems().map(normalizeStoreItem);
   }
 
   // POST /api/store/buy
@@ -629,11 +627,43 @@ class ApiService {
     storageService.saveUser(updatedUser);
 
     return {
+  success: true,
+  remainingGold: updatedUser.character.gold,
+  updatedUser,
+  item,
+};
+  }
+  // POST /api/store/use/:itemId
+async useStoreItem(itemId) {
+  if (!itemId) {
+    return {
       success: false,
-      error: res?.error || "Failed to use item",
+      error: "Invalid inventory item ID",
     };
   }
 
+  const res = await this.request(
+    `/store/use/${encodeURIComponent(itemId)}`,
+    {
+      method: "POST",
+    }
+  );
+
+  if (res?.user) {
+    return {
+      success: true,
+      message: res.message || "Item used successfully",
+      effect: res.effect || null,
+      remainingQuantity: res.remainingQuantity ?? 0,
+      updatedUser: res.user,
+    };
+  }
+
+  return {
+    success: false,
+    error: res?.error || "Unable to use item",
+  };
+}
   /* ==================== 6. STREAKS & ACTIVITY LOGS ==================== */
 
   // GET /api/streaks
