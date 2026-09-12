@@ -8,8 +8,12 @@ import User from "../models/userSchema.js";
 const stamp = Date.now();
 
 const testUser = {
+    name: "AI Test User",
     username: `aitest_${stamp}`,
     email: `aitest_${stamp}@example.com`,
+    gender: "male",
+    age: 21,
+    profilePic: null,
     password: "TestPassword123!",
 };
 

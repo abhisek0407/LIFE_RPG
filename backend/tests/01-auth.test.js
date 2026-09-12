@@ -6,8 +6,12 @@ import User from "../models/userSchema.js";
 
 const stamp = Date.now();
 const testUser = {
+    name: "Auth Test User",
     username: `authtest_${stamp}`,
     email: `authtest_${stamp}@example.com`,
+    gender: "male",
+    age: 21,
+    profilePic: null,
     password: "TestPassword123!",
 };
 
@@ -81,4 +85,53 @@ test("GET /api/auth/me — returns the logged-in user", async () => {
     assert.equal(status, 200);
     assert.equal(data.user._id, userId);
     assert.equal(data.user.email, testUser.email);
+});
+test("PATCH /api/auth/profile — updates editable profile fields", async () => {
+    const { status, data } = await api("PATCH", "/api/auth/profile", {
+        name: "Updated Test User",
+        username: `updated_${stamp}`,
+        gender: "female",
+        age: 25,
+        profilePic: "https://example.com/profile.jpg",
+    });
+
+    assert.equal(
+        status,
+        200,
+        `Expected 200, got ${status}: ${JSON.stringify(data)}`
+    );
+
+    assert.equal(data.user.name, "Updated Test User");
+    assert.equal(data.user.username, `updated_${stamp}`);
+    assert.equal(data.user.email, testUser.email);
+    assert.equal(data.user.gender, "female");
+    assert.equal(data.user.age, 25);
+    assert.equal(
+        data.user.profilePic,
+        "https://example.com/profile.jpg"
+    );
+});
+test("PATCH /api/auth/profile — rejects email modification", async () => {
+    const { status, data } = await api(
+        "PATCH",
+        "/api/auth/profile",
+        {
+            email: "attacker@example.com",
+        }
+    );
+
+    assert.equal(status, 400);
+    assert.match(data.error, /email/i);
+});
+test("PATCH /api/auth/profile — requires authentication", async () => {
+    const { status } = await api(
+        "PATCH",
+        "/api/auth/profile",
+        {
+            name: "Should Not Work",
+        },
+        false
+    );
+
+    assert.equal(status, 401);
 });

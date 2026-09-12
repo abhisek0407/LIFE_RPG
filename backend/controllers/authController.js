@@ -313,148 +313,134 @@ export async function resetPassword(req, res) {
   }
 }
 export async function updateProfile(req, res) {
-    try {
-        const {
-            name,
-            username,
-            gender,
-            age,
-            profilePic,
-        } = req.body;
+  try {
+    const { name, username, gender, age, profilePic } = req.body;
 
-        
-        const user = req.user;
+    const user = req.user;
+    const allowedFields = ["name", "username", "gender", "age", "profilePic"];
 
-    
+    const invalidFields = Object.keys(req.body).filter(
+      (field) => !allowedFields.includes(field),
+    );
 
-        if (name !== undefined) {
-            const normalizedName = name.trim();
-
-            if (normalizedName.length < 2) {
-                return res.status(400).json({
-                    error: "Name must be at least 2 characters",
-                });
-            }
-
-            if (normalizedName.length > 50) {
-                return res.status(400).json({
-                    error: "Name cannot exceed 50 characters",
-                });
-            }
-
-            user.name = normalizedName;
-        }
-
-        // ── Update Username ─────────────────────────────────
-
-        if (username !== undefined) {
-            const normalizedUsername = username.trim();
-
-            if (normalizedUsername.length < 3) {
-                return res.status(400).json({
-                    error: "Username must be at least 3 characters",
-                });
-            }
-
-            if (normalizedUsername.length > 30) {
-                return res.status(400).json({
-                    error: "Username cannot exceed 30 characters",
-                });
-            }
-
-            // Check if another user already has this username
-            const existingUser = await User.findOne({
-                username: normalizedUsername,
-                _id: { $ne: user._id },
-            });
-
-            if (existingUser) {
-                return res.status(409).json({
-                    error: "Username already taken",
-                });
-            }
-
-            user.username = normalizedUsername;
-        }
-
-        // ── Update Gender ───────────────────────────────────
-
-        if (gender !== undefined) {
-            const validGenders = [
-                "male",
-                "female",
-                "non-binary",
-                "prefer_not_to_say",
-            ];
-
-            if (!validGenders.includes(gender)) {
-                return res.status(400).json({
-                    error: "Invalid gender",
-                });
-            }
-
-            user.gender = gender;
-        }
-
-        // ── Update Age ──────────────────────────────────────
-
-        if (age !== undefined) {
-            const numericAge = Number(age);
-
-            if (!Number.isInteger(numericAge)) {
-                return res.status(400).json({
-                    error: "Age must be a whole number",
-                });
-            }
-
-            if (numericAge < 13 || numericAge > 120) {
-                return res.status(400).json({
-                    error: "Age must be between 13 and 120",
-                });
-            }
-
-            user.age = numericAge;
-        }
-
-        // ── Update Profile Picture ───────────────────────────
-
-        if (profilePic !== undefined) {
-            user.profilePic =
-                profilePic === null || profilePic === ""
-                    ? null
-                    : profilePic.trim();
-        }
-
-        // ── Save Changes ────────────────────────────────────
-
-        await user.save();
-
-        return res.status(200).json({
-            message: "Profile updated successfully",
-            user,
-        });
-
-    } catch (err) {
-        console.error("Update profile error:", err);
-
-        // Handle MongoDB duplicate username race condition
-        if (err.code === 11000) {
-            return res.status(409).json({
-                error: "Username already taken",
-            });
-        }
-
-        // Handle Mongoose validation errors
-        if (err.name === "ValidationError") {
-            const firstError = Object.values(err.errors)[0];
-
-            return res.status(400).json({
-                error: firstError.message,
-            });
-        }
-
-        return res.status(500).json({
-            error: "Failed to update profile",
-        });
+    if (invalidFields.length > 0) {
+      return res.status(400).json({
+        error: `Cannot update field(s): ${invalidFields.join(", ")}`,
+      });
     }
+
+    if (name !== undefined) {
+      const normalizedName = name.trim();
+
+      if (normalizedName.length < 2) {
+        return res.status(400).json({
+          error: "Name must be at least 2 characters",
+        });
+      }
+
+      if (normalizedName.length > 50) {
+        return res.status(400).json({
+          error: "Name cannot exceed 50 characters",
+        });
+      }
+
+      user.name = normalizedName;
+    }
+
+    if (username !== undefined) {
+      const normalizedUsername = username.trim();
+
+      if (normalizedUsername.length < 3) {
+        return res.status(400).json({
+          error: "Username must be at least 3 characters",
+        });
+      }
+
+      if (normalizedUsername.length > 30) {
+        return res.status(400).json({
+          error: "Username cannot exceed 30 characters",
+        });
+      }
+
+      const existingUser = await User.findOne({
+        username: normalizedUsername,
+        _id: { $ne: user._id },
+      });
+
+      if (existingUser) {
+        return res.status(409).json({
+          error: "Username already taken",
+        });
+      }
+
+      user.username = normalizedUsername;
+    }
+
+    if (gender !== undefined) {
+      const validGenders = [
+        "male",
+        "female",
+        "non-binary",
+        "prefer_not_to_say",
+      ];
+
+      if (!validGenders.includes(gender)) {
+        return res.status(400).json({
+          error: "Invalid gender",
+        });
+      }
+
+      user.gender = gender;
+    }
+
+    if (age !== undefined) {
+      const numericAge = Number(age);
+
+      if (!Number.isInteger(numericAge)) {
+        return res.status(400).json({
+          error: "Age must be a whole number",
+        });
+      }
+
+      if (numericAge < 13 || numericAge > 120) {
+        return res.status(400).json({
+          error: "Age must be between 13 and 120",
+        });
+      }
+
+      user.age = numericAge;
+    }
+
+    if (profilePic !== undefined) {
+      user.profilePic =
+        profilePic === null || profilePic === "" ? null : profilePic.trim();
+    }
+
+    await user.save();
+
+    return res.status(200).json({
+      message: "Profile updated successfully",
+      user,
+    });
+  } catch (err) {
+    console.error("Update profile error:", err);
+
+    if (err.code === 11000) {
+      return res.status(409).json({
+        error: "Username already taken",
+      });
+    }
+
+    if (err.name === "ValidationError") {
+      const firstError = Object.values(err.errors)[0];
+
+      return res.status(400).json({
+        error: firstError.message,
+      });
+    }
+
+    return res.status(500).json({
+      error: "Failed to update profile",
+    });
+  }
 }

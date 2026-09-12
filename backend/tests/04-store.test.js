@@ -8,8 +8,12 @@ import ActivityLog from "../models/activityLogSchema.js";
 
 const stamp = Date.now();
 const testUser = {
+    name: "Store Test User",
     username: `storetest_${stamp}`,
     email: `storetest_${stamp}@example.com`,
+    gender: "male",
+    age: 21,
+    profilePic: null,
     password: "TestPassword123!",
 };
 
