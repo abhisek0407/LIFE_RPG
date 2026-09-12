@@ -1,12 +1,19 @@
 import DailyQuest from "../models/dailyQuestSchema.js";
 import { awardXp, awardGold, updateStreak, logActivity } from "../services/progressionService.js";
 
-// Helper: "YYYY-MM-DD" for today / yesterday
+// Helper: "YYYY-MM-DD" for today / yesterday in the server's local timezone
+function toLocalDateKey(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
 function todayStr() {
-    return new Date().toISOString().slice(0, 10);
+    return toLocalDateKey(new Date());
 }
 function yesterdayStr() {
-    return new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    return toLocalDateKey(new Date(Date.now() - 86400000));
 }
 
 // Resets isCompletedToday on a new day, and breaks streakDays back to 0
@@ -139,6 +146,11 @@ export async function completeDailyQuest(req, res) {
         }
 
         return res.status(200).json({
+            success: true,
+            xpAwarded: xpResult.xpAwarded,
+            goldAwarded: daily.goldReward,
+            bonusXp: Math.max(0, xpResult.xpAwarded - daily.xpReward),
+            streakDays: daily.streakDays,
             dailyQuest: daily,
             progression: xpResult,
             streak: {
@@ -146,6 +158,7 @@ export async function completeDailyQuest(req, res) {
                 longestStreak: user.streak.longestStreak,
                 changed: streakResult.changed,
             },
+            updatedUser: user,
             user,
         });
     } catch (err) {

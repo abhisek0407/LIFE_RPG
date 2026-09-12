@@ -41,6 +41,8 @@ export default function ActiveQuestsView({
   };
 
   const getQuestStatus = (quest) => {
+    // If DB marks it completed, it's always conquered
+    if (quest.status === 'completed') return 'conquered';
     const total = quest.microtasks?.length || 0;
     const completed = quest.microtasks?.filter((m) => m.isCompleted).length || 0;
 
@@ -80,9 +82,11 @@ export default function ActiveQuestsView({
 
     soundService.playMicrotaskComplete();
 
-    const remainingIncomplete = quest.microtasks.filter(
-      (m) => !m.isCompleted && m.id !== microtask.id
-    ).length;
+    const microtaskKey = microtask.id ?? microtask._id;
+    const remainingIncomplete = (quest.microtasks || []).filter((m) => {
+      const taskKey = m.id ?? m._id;
+      return !m.isCompleted && taskKey !== microtaskKey;
+    }).length;
 
     if (remainingIncomplete === 0) {
       soundService.playQuestComplete();
@@ -96,28 +100,29 @@ export default function ActiveQuestsView({
     }
 
     onCompleteMicrotask({
-      questId: quest.id,
-      microtaskId: microtask.id,
+      questId: quest.id ?? quest._id,
+      microtaskId: microtaskKey,
       domain: quest.domain,
       xp: microtask.xpReward || 25,
       gold: microtask.goldReward || 8,
-      isQuestFinished: remainingIncomplete === 0
+      isQuestFinished: remainingIncomplete === 0,
     });
   };
   const renderQuestCard = (quest) => {
+    const questKey = quest.id ?? quest._id;
     const domainConfig = DOMAINS[quest.domain] || DOMAINS.mental;
     const completedCount = quest.microtasks.filter((m) => m.isCompleted).length;
     const totalCount = quest.microtasks.length;
     const pct = Math.round((completedCount / Math.max(1, totalCount)) * 100);
     const status = getQuestStatus(quest);
-    const isCollapsed = isQuestCollapsed(quest.id);
+    const isCollapsed = isQuestCollapsed(questKey);
     const createdDateFormatted = formatCreatedDate(quest.createdAt);
 
     const Icon = quest.domain === 'mental' ? Brain : quest.domain === 'health' ? HeartPulse : Sparkles;
 
     return (
       <div
-        key={quest.id}
+        key={questKey}
         className={`rounded-2xl border transition-all duration-200 bg-white dark:bg-rpg-card/90 overflow-hidden shadow-sm dark:shadow-none ${
           status === 'conquered'
             ? 'border-emerald-300 dark:border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-950/10'
@@ -161,7 +166,7 @@ export default function ActiveQuestsView({
                   </span>
                 )}
 
-                {/* Created Date requirement */}
+                {/* Created Date */}
                 <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1">
                   <Calendar className="w-3 h-3 text-slate-400" />
                   <span>Created: {createdDateFormatted}</span>
@@ -192,7 +197,7 @@ export default function ActiveQuestsView({
             </div>
 
             <button
-              onClick={() => toggleCollapse(quest.id)}
+              onClick={() => toggleCollapse(questKey)}
               className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
               title="Expand / Collapse microtasks"
             >
@@ -202,7 +207,7 @@ export default function ActiveQuestsView({
             <button
               onClick={() => {
                 soundService.playClick();
-                onDeleteQuest(quest.id);
+                onDeleteQuest(questKey);
               }}
               className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
               title="Abandon Quest"

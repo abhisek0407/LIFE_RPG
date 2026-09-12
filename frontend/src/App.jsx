@@ -7,7 +7,6 @@ import StreakCalendarView from "./components/StreakCalendarView";
 import DailyQuestsView from "./components/DailyQuestsView";
 import StoreView from "./components/StoreView";
 import ActiveQuestsView from "./components/ActiveQuestsView";
-import PersonaAvatarView from "./components/PersonaAvatarView";
 import QuestDecompositionModal from "./components/QuestDecompositionModal";
 import FeelStuckModal from "./components/FeelStuckModal";
 import LevelUpModal from "./components/LevelUpModal";
@@ -17,10 +16,25 @@ import LoginPage from "./components/LoginPage";
 import RegisterPage from "./components/RegisterPage";
 import { apiService } from "./services/apiService";
 import { storageService } from "./services/storageService";
-import { DOMAINS } from "./services/rpgEngine";
+import { DOMAINS, applyProgression, getEffectiveOverallLevel, getPlayerTitle } from "./services/rpgEngine";
 import ForgotPasswordPage from "./components/ForgotPasswordPage";
 import ResetPasswordPage from "./components/ResetPasswordPage";
 import ProfileSettings from "./components/ProfileSettings";
+
+const normalizeQuestForUi = (quest = {}) => ({
+  ...quest,
+  id: quest.id ?? quest._id,
+  _id: quest._id ?? quest.id,
+  microtasks: Array.isArray(quest.microtasks)
+    ? quest.microtasks.map((microtask = {}) => ({
+        ...microtask,
+        id: microtask.id ?? microtask._id,
+        _id: microtask._id ?? microtask.id,
+        isCompleted: Boolean(microtask.isCompleted),
+      }))
+    : [],
+});
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -54,7 +68,15 @@ export default function App() {
         const currentUser = await apiService.getCurrentUser();
 
         if (currentUser) {
-          setUser(currentUser);
+          const normalizedUser = {
+            ...currentUser,
+            character: {
+              ...currentUser.character,
+              overallLevel: getEffectiveOverallLevel(currentUser),
+              title: getPlayerTitle(getEffectiveOverallLevel(currentUser)),
+            },
+          };
+          setUser(normalizedUser);
         } else {
           apiService.setToken(null);
         }
@@ -98,7 +120,8 @@ export default function App() {
   // Automatic dopamine streak popup on login / session visit
   const [isStreakModalOpen, setIsStreakModalOpen] = useState(() => {
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const date = new Date();
+      const today = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
       const lastShown = sessionStorage.getItem("lrpg_streak_popup_shown");
       if (lastShown === today) return false;
       sessionStorage.setItem("lrpg_streak_popup_shown", today);
@@ -114,7 +137,7 @@ export default function App() {
     async function loadData() {
       try {
         const [questsData, dailiesData, storeData] = await Promise.all([
-          apiService.getQuests(),
+          apiService.getQuests("all"),
           apiService.getDailies(),
           apiService.getStoreItems(),
         ]);
@@ -186,17 +209,34 @@ export default function App() {
     gold,
     isQuestFinished,
   }) => {
-    // Optimistic UI update
+    const normalizedQuestId = questId;
+    const normalizedMicrotaskId = microtaskId;
+
+    if (user) {
+      const optimisticProgression = applyProgression({
+        userData: user,
+        domainKey: domain,
+        xpAmount: xp,
+        goldAmount: gold,
+      });
+      setUser(optimisticProgression.updatedUser);
+    }
+
     setQuests((prevQuests) =>
       prevQuests.map((quest) => {
-        if (quest.id !== questId) return quest;
-        const updatedTasks = quest.microtasks.map((m) =>
-          m.id === microtaskId
-            ? { ...m, isCompleted: true, completedAt: new Date().toISOString() }
-            : m,
-        );
+        const questKey = quest.id ?? quest._id;
+        if (questKey !== normalizedQuestId) return quest;
+
+        const updatedTasks = (quest.microtasks || []).map((m) => {
+          const taskKey = m.id ?? m._id;
+          return taskKey === normalizedMicrotaskId
+            ? { ...m, id: taskKey, _id: m._id ?? taskKey, isCompleted: true, completedAt: new Date().toISOString() }
+            : m;
+        });
+
         return {
           ...quest,
+          id: questKey,
           microtasks: updatedTasks,
           earnedXp: (quest.earnedXp || 0) + xp,
           earnedGold: (quest.earnedGold || 0) + gold,
@@ -215,8 +255,28 @@ export default function App() {
       isQuestFinished,
     });
 
-    if (result?.updatedUser) {
-      setUser(result.updatedUser);
+    const serverUser = result?.updatedUser || result?.user;
+    if (serverUser) {
+      setUser(serverUser);
+    }
+
+    if (result?.quest) {
+      const normalizedServerQuest = normalizeQuestForUi(result.quest);
+      setQuests((prevQuests) =>
+        prevQuests.map((quest) => {
+          const currentQuestId = quest.id ?? quest._id;
+          const incomingQuestId = normalizedServerQuest.id ?? normalizedServerQuest._id;
+          return currentQuestId === incomingQuestId
+            ? {
+                ...quest,
+                ...normalizedServerQuest,
+                id: incomingQuestId,
+                _id: normalizedServerQuest._id ?? incomingQuestId,
+                microtasks: normalizedServerQuest.microtasks,
+              }
+            : quest;
+        }),
+      );
     }
 
     const domainName = DOMAINS[domain]?.name || "XP";
@@ -315,10 +375,50 @@ export default function App() {
     setDailies((prev) => [...prev, created]);
   };
 
+  const handleDeleteDaily = async (daily) => {
+    const dailyId = daily?.id ?? daily?._id;
+    if (!dailyId) return;
+
+    await apiService.deleteDaily(dailyId);
+    setDailies((prev) => prev.filter((item) => (item.id ?? item._id) !== dailyId));
+  };
+
   const handleBuyItem = async (item) => {
+  try {
     const result = await apiService.buyStoreItem(item, user);
+
+    if (result?.success && result?.updatedUser) {
+      setUser(result.updatedUser);
+      return true;
+    }
+
+    console.error("Store purchase failed:", result);
+
+    alert(
+      result?.error ||
+        "Purchase failed. Please check the backend server."
+    );
+
+    return false;
+  } catch (error) {
+    console.error("Store purchase error:", error);
+    alert("Unable to complete purchase.");
+    return false;
+  }
+};
+  const handleUseItem = async (item) => {
+    const itemId = item.itemId || item._id;
+
+    const result = await apiService.useStoreItem(itemId);
+
     if (result?.updatedUser) {
       setUser(result.updatedUser);
+    }
+
+    if (result?.success) {
+      alert(result.message);
+    } else {
+      alert(result?.error || "Unable to use item");
     }
   };
 
@@ -431,7 +531,6 @@ export default function App() {
           soundEnabled={soundEnabled}
           setSoundEnabled={setSoundEnabled}
           onOpenStreakModal={() => setIsStreakModalOpen(true)}
-          onOpenPersonaTab={() => setActiveTab("persona")}
           onOpenProfile={() => setActiveTab("profile")}
         />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-6xl w-full mx-auto space-y-8">
@@ -461,14 +560,6 @@ export default function App() {
             />
           )}
 
-          {activeTab === "persona" && (
-            <PersonaAvatarView
-              user={user}
-              onUpdateUser={(updated) => setUser(updated)}
-              onShowFeedback={showFeedback}
-            />
-          )}
-
           {activeTab === "streak" && (
             <StreakCalendarView
               user={user}
@@ -481,6 +572,7 @@ export default function App() {
               dailies={dailies}
               onToggleDaily={handleToggleDaily}
               onAddDaily={handleAddDaily}
+              onDeleteDaily={handleDeleteDaily}
             />
           )}
 
@@ -489,6 +581,7 @@ export default function App() {
               user={user}
               storeItems={storeItems}
               onBuyItem={handleBuyItem}
+              onUseItem={handleUseItem}
             />
           )}
           {activeTab === "profile" && (

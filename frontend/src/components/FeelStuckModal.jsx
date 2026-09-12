@@ -111,7 +111,7 @@ export default function FeelStuckModal({ isOpen, onClose, onCompleteGroundingTas
         </div>
         <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/25 text-amber-900 dark:text-amber-200 text-xs sm:text-sm mb-6 leading-relaxed flex items-start gap-2.5">
           <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-          <p>{data.reassurance}</p>
+          <p>{data.encouragement}</p>
         </div>
         <div className="overflow-y-auto pr-1 space-y-6 flex-1">
           <div className="p-5 rounded-2xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-rpg-border flex flex-col items-center justify-center relative overflow-hidden">

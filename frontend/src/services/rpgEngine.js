@@ -100,6 +100,22 @@ export function getPlayerTitle(overallLevel) {
   return 'Novice Seeker';
 }
 
+export function getEffectiveOverallLevel(userData) {
+  if (!userData?.domains) {
+    return Math.max(1, Number(userData?.character?.overallLevel) || 1);
+  }
+
+  const domains = userData.domains;
+  const domainLevels = [
+    Number(domains.mental?.level) || 1,
+    Number(domains.health?.level) || 1,
+    Number(domains.skill?.level) || 1,
+  ];
+
+  const derivedLevel = Math.max(1, Math.floor(domainLevels.reduce((sum, level) => sum + level, 0) / domainLevels.length));
+  return Number.isFinite(derivedLevel) ? derivedLevel : Math.max(1, Number(userData?.character?.overallLevel) || 1);
+}
+
 /**
  * Processes an XP gain for a domain and user stats.
  * Handles level-ups with carry-over XP.
@@ -129,9 +145,7 @@ export function applyProgression({ userData, domainKey, xpAmount, goldAmount }) 
   domain.level = newDomainLevel;
   domain.xpToNextLevel = needed;
 
-  // Update overall character level (average of domains or sum-based)
-  const sumLevels = updated.domains.mental.level + updated.domains.health.level + updated.domains.skill.level;
-  const newOverallLevel = Math.max(1, Math.floor(sumLevels / 3));
+  const newOverallLevel = getEffectiveOverallLevel(updated);
   const overallLeveledUp = newOverallLevel > (updated.character.overallLevel || 1);
 
   updated.character.overallLevel = newOverallLevel;

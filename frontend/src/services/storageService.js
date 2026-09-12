@@ -19,28 +19,28 @@ const DEFAULT_USER = {
   id: 'usr_default_hero_01',
   username: 'Alex V.',
   character: {
-    title: 'Adept Pathfinder',
+    title: 'Novice Seeker',
     avatar: 'cyber_paladin',
-    overallLevel: 3,
-    totalXpEarned: 1420,
-    gold: 145,
-    gems: 12
+    overallLevel: 1,
+    totalXpEarned: 0,
+    gold: 50,
+    gems: 5
   },
   domains: {
     mental: {
-      level: 3,
-      currentXp: 180,
-      xpToNextLevel: 519
+      level: 1,
+      currentXp: 0,
+      xpToNextLevel: 100
     },
     health: {
-      level: 2,
-      currentXp: 95,
-      xpToNextLevel: 282
+      level: 1,
+      currentXp: 0,
+      xpToNextLevel: 100
     },
     skill: {
-      level: 4,
-      currentXp: 310,
-      xpToNextLevel: 800
+      level: 1,
+      currentXp: 0,
+      xpToNextLevel: 100
     }
   },
   streak: {

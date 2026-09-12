@@ -99,26 +99,27 @@ export default function QuestDecompositionModal({
 
   const handleAddCustomTask = (e) => {
     e?.preventDefault();
-    if (!newCustomTaskText.trim()) return;
+    const trimmedText = newCustomTaskText.trim();
+    if (!trimmedText) return;
 
     soundService.playClick();
     const newTask = {
       id: `mt_custom_${Date.now()}`,
-      title: newCustomTaskText.trim(),
-      order: microtasks.length + 1,
+      title: trimmedText,
+      order: (microtasks?.length || 0) + 1,
       xpReward: 25,
       goldReward: 8,
       isCompleted: false,
-      completedAt: null
+      completedAt: null,
     };
 
-    setMicrotasks([...microtasks, newTask]);
+    setMicrotasks((prev) => [...(prev || []), newTask]);
     setNewCustomTaskText('');
   };
 
   const handleRemoveMicrotask = (id) => {
     soundService.playClick();
-    setMicrotasks(microtasks.filter((m) => m.id !== id));
+    setMicrotasks((prev) => (prev || []).filter((m) => m.id !== id));
   };
 
   const handleAcceptQuest = () => {
@@ -327,7 +328,7 @@ export default function QuestDecompositionModal({
               </p>
             </div>
           )}
-          {isGenerated && (
+          {(isGenerated || microtasks.length > 0) && (
             <div className="space-y-3 pt-1">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 flex items-center gap-1.5">
@@ -367,6 +368,7 @@ export default function QuestDecompositionModal({
                   </div>
                 ))}
               </div>
+
               <form onSubmit={handleAddCustomTask} className="flex gap-2 pt-1">
                 <input
                   type="text"
@@ -402,7 +404,7 @@ export default function QuestDecompositionModal({
           <button
             type="button"
             onClick={handleAcceptQuest}
-            disabled={!isGenerated || microtasks.length === 0}
+            disabled={microtasks.length === 0}
             className="btn-tactile px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-sm flex items-center gap-2 shadow-glow-health disabled:opacity-40 disabled:pointer-events-none"
           >
             <span>Accept Quest into Log</span>

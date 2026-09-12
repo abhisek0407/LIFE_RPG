@@ -293,7 +293,7 @@ export default function PersonaAvatarView({ user, onUpdateUser, onShowFeedback }
             <span className="text-xs font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-500/30">
               Customization Studio
             </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Syncs with /api/users/profile</span>
+            {/* <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Syncs with /api/users/profile</span> */}
           </div>
           <h3 className="font-heading font-bold text-xl text-slate-900 dark:text-white">
             Customize Your Hero Avatar & Aura

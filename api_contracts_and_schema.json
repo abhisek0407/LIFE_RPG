@@ -238,7 +238,7 @@
     },
     {
       "category": "User Profile & Customization",
-      "endpoint": "/api/users/profile",
+      "endpoint": "/api/auth/profile",
       "method": "PATCH",
       "description": "Update player avatar, character title, avatar frame, aura, and persona archetype customization.",
       "authRequired": true,
@@ -267,7 +267,7 @@
       "authRequired": true,
       "headers": { "Authorization": "Bearer <TOKEN>" },
       "requestBody": {
-        "task": "Study 3 chapters of Distributed Systems for Midterm",
+        "description": "Study 3 chapters of Distributed Systems for Midterm",
         "domain": "mental",
         "difficulty": "medium",
         "motivationLevel": "low"
@@ -275,7 +275,7 @@
       "successResponse": {
         "status": 200,
         "body": {
-          "task": "Study 3 chapters of Distributed Systems for Midterm",
+          "description": "Study 3 chapters of Distributed Systems for Midterm",
           "domain": "mental",
           "difficulty": "medium",
           "motivationLevel": "low",

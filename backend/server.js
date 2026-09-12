@@ -11,6 +11,7 @@ import authRoutes from "./routes/authRoutes.js";
 import dailyQuestRoutes from "./routes/dailyQuestRoutes.js";
 import storeRoutes from "./routes/storeRoutes.js";
 import streakRoutes from "./routes/streakRoutes.js";
+import activityLogRoutes from "./routes/activityLogRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import { protect } from "./middleware/authMiddleware.js";
 
@@ -28,8 +29,24 @@ const PORT = process.env.PORT || 5000;
 await connectDB();
 
 
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:3000",
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    if (process.env.NODE_ENV !== "production" && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
   credentials: true,
 }));
 app.use(express.json());
@@ -38,10 +55,12 @@ app.use(cookieParser());
 
 
 app.use("/api/auth", authRoutes);
+app.use("/api/users", authRoutes);
 app.use("/api/quests", protect, questRoutes);
 app.use("/api/daily-quests", protect, dailyQuestRoutes);
 app.use("/api/store", protect, storeRoutes);
 app.use("/api/streaks", protect, streakRoutes);
+app.use("/api/activity-logs", protect, activityLogRoutes);
 app.use("/api/ai", protect, aiRoutes);
 
 

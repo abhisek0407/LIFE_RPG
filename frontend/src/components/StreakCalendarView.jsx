@@ -12,6 +12,7 @@ import {
 import confetti from 'canvas-confetti';
 import { getStreakMultiplier } from '../services/rpgEngine';
 import { soundService } from '../services/soundService';
+import { apiService } from '../services/apiService';
 
 const MONTH_NAMES = [
   'January','February','March','April','May','June',
@@ -23,23 +24,49 @@ const toDateKey = (d) =>
 
 export default function StreakCalendarView({ user, onClaimDailyCheckIn }) {
   const { streak } = user;
-  const currentStreak = streak?.currentStreak || 1;
-  const longestStreak = streak?.longestStreak || 1;
-  const multiplier    = getStreakMultiplier(currentStreak);
+  const [streakData, setStreakData] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadStreakData = async () => {
+      try {
+        const data = await apiService.getStreakData();
+        if (active) setStreakData(data);
+      } catch (err) {
+        console.warn('Failed to load streak data', err);
+      }
+    };
+
+    loadStreakData();
+    return () => {
+      active = false;
+    };
+  }, [user?._id]);
+
+  const currentStreak = streakData?.currentStreak ?? streak?.currentStreak ?? 1;
+  const longestStreak = streakData?.longestStreak ?? streak?.longestStreak ?? 1;
+  const multiplier = streakData?.multiplier ?? getStreakMultiplier(currentStreak);
+  const streakDays = streakData?.recentDays || streakData?.heatmap || [];
+  const activeKeys = new Set(
+    streakDays
+      .filter((entry) => {
+        const count = Number(entry.tasksCompleted ?? entry.count ?? 0);
+        return count > 0;
+      })
+      .map((entry) => entry.date || entry.day)
+  );
 
   const [hasCheckedInToday, setHasCheckedInToday] = useState(false);
   const realToday = new Date();
+  useEffect(() => {
+    setHasCheckedInToday(activeKeys.has(toDateKey(realToday)));
+  }, [activeKeys, realToday]);
   const todayKey  = toDateKey(realToday);
 
   // Calendar view state – start at current month
   const [viewYear,  setViewYear]  = useState(realToday.getFullYear());
   const [viewMonth, setViewMonth] = useState(realToday.getMonth()); 
-  const activeKeys = new Set();
-  for (let i = 0; i < currentStreak; i++) {
-    const d = new Date(realToday);
-    d.setDate(d.getDate() - i);
-    activeKeys.add(toDateKey(d));
-  }
 
   // Live clock for "real-time" feel
   const [now, setNow] = useState(new Date());

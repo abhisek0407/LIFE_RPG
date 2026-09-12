@@ -39,9 +39,11 @@ export default function ActiveQuestsList({
 
     soundService.playMicrotaskComplete();
 
-    const remainingIncomplete = quest.microtasks.filter(
-      (m) => !m.isCompleted && m.id !== microtask.id
-    ).length;
+    const microtaskKey = microtask.id ?? microtask._id;
+    const remainingIncomplete = (quest.microtasks || []).filter((m) => {
+      const taskKey = m.id ?? m._id;
+      return !m.isCompleted && taskKey !== microtaskKey;
+    }).length;
 
     if (remainingIncomplete === 0) {
       soundService.playQuestComplete();
@@ -55,12 +57,12 @@ export default function ActiveQuestsList({
     }
 
     onCompleteMicrotask({
-      questId: quest.id,
-      microtaskId: microtask.id,
+      questId: quest.id ?? quest._id,
+      microtaskId: microtaskKey,
       domain: quest.domain,
       xp: microtask.xpReward || 25,
       gold: microtask.goldReward || 8,
-      isQuestFinished: remainingIncomplete === 0
+      isQuestFinished: remainingIncomplete === 0,
     });
   };
 

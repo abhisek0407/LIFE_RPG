@@ -11,7 +11,7 @@ import {
 import { DOMAINS } from '../services/rpgEngine';
 import { soundService } from '../services/soundService';
 
-export default function DailyQuestsView({ dailies, onToggleDaily, onAddDaily }) {
+export default function DailyQuestsView({ dailies, onToggleDaily, onAddDaily, onDeleteDaily }) {
   const [newTitle, setNewTitle] = useState('');
   const [newDomain, setNewDomain] = useState('health');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -19,6 +19,13 @@ export default function DailyQuestsView({ dailies, onToggleDaily, onAddDaily }) 
   const handleToggle = (daily) => {
     soundService.playMicrotaskComplete();
     onToggleDaily(daily);
+  };
+
+  const handleDelete = (e, daily) => {
+    e.stopPropagation();
+    if (onDeleteDaily) {
+      onDeleteDaily(daily);
+    }
   };
 
   const handleAddSubmit = (e) => {
@@ -160,6 +167,14 @@ export default function DailyQuestsView({ dailies, onToggleDaily, onAddDaily }) 
                 <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300">
                   +{daily.goldReward}g
                 </span>
+                <button
+                  type="button"
+                  onClick={(e) => handleDelete(e, daily)}
+                  className="ml-1 px-2 py-1 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-300 text-[10px] font-bold hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors"
+                  aria-label={`Delete ${daily.title}`}
+                >
+                  Delete
+                </button>
               </div>
             </div>
           );
