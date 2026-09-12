@@ -40,68 +40,182 @@ class ApiService {
    * returns null so the calling method gracefully executes local persistence.
    */
   async request(endpoint, options = {}) {
-    try {
-      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
-        ...options,
-        headers: {
-          ...this.getHeaders(),
-          ...options.headers
-        }
-      });
-
-      if (!res.ok) {
-        console.warn(`[API] ${options.method || 'GET'} ${endpoint} responded with status ${res.status}`);
-        return null;
+  try {
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        ...this.getHeaders(),
+        ...options.headers
       }
+    });
 
-      return await res.json();
-    } catch (err) {
-      // Backend is offline or unreachable in local dev -> handled silently
-      return null;
+    let data = null;
+
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
     }
+
+    if (!res.ok) {
+      console.warn(
+        `[API] ${options.method || 'GET'} ${endpoint} responded with status ${res.status}`,
+        data
+      );
+
+      return {
+        success: false,
+        status: res.status,
+        error: data?.error || data?.message || 'Request failed'
+      };
+    }
+
+    return data;
+  } catch (err) {
+    console.error(`[API] ${options.method || 'GET'} ${endpoint} failed`, err);
+
+    return {
+      success: false,
+      error: 'Unable to connect to the server'
+    };
   }
+}
 
   /* ==================== 1. AUTHENTICATION ==================== */
 
   // POST /api/auth/register
-  async register(username, email, password) {
-    const res = await this.request('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ username, email, password })
-    });
+async register({
+  name,
+  username,
+  email,
+  gender,
+  age,
+  profilePic = null,
+  password
+}) {
+  const res = await this.request('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      name,
+      username,
+      email,
+      gender,
+      age: Number(age),
+      profilePic,
+      password
+    })
+  });
 
-    if (res?.token) {
-      this.setToken(res.token);
-      return res.user;
-    }
+  if (res?.token && res?.user) {
+    this.setToken(res.token);
 
-    // Local fallback
-    const user = storageService.getUser();
-    user.username = username;
-    user.email = email;
-    storageService.saveUser(user);
-    return user;
+    return {
+      success: true,
+      user: res.user
+    };
   }
 
-  // POST /api/auth/login
-  async login(email, password) {
-    const res = await this.request('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password })
-    });
+  return {
+    success: false,
+    error: res?.error || 'Registration failed'
+  };
+}
 
-    if (res?.token) {
-      this.setToken(res.token);
-      return res.user;
-    }
+// POST /api/auth/login
+async login(email, password) {
+  const res = await this.request('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({
+      email,
+      password
+    })
+  });
 
-    return storageService.getUser();
+  if (res?.token && res?.user) {
+    this.setToken(res.token);
+
+    return {
+      success: true,
+      user: res.user
+    };
   }
 
-  // Logout
-  logout() {
+  return {
+    success: false,
+    error: res?.error || 'Invalid email or password'
+  };
+}
+// POST /api/auth/forgot-password
+async forgotPassword(email) {
+  const res = await this.request('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: email.trim().toLowerCase()
+    })
+  });
+
+  if (res?.message) {
+    return {
+      success: true,
+      message: res.message,
+      resetToken: res.resetToken || null
+    };
+  }
+
+  return {
+    success: false,
+    error: res?.error || 'Unable to process password reset request'
+  };
+}
+// POST /api/auth/reset-password
+async resetPassword(token, password) {
+  const res = await this.request('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({
+      token,
+      password
+    })
+  });
+
+  if (res?.token && res?.user) {
+    this.setToken(res.token);
+
+    return {
+      success: true,
+      message: res.message || 'Password reset successfully',
+      user: res.user
+    };
+  }
+
+  return {
+    success: false,
+    error: res?.error || 'Unable to reset password'
+  };
+}
+// POST /api/auth/logout
+async logout() {
+  try {
+    await this.request('/auth/logout', {
+      method: 'POST'
+    });
+  } finally {
+    // Always remove the frontend JWT
     this.setToken(null);
+
+    // Clear local fallback data
+    try {
+      localStorage.removeItem('lrpg_user');
+      localStorage.removeItem('lrpg_quests');
+      localStorage.removeItem('lrpg_dailies');
+    } catch (e) {
+      console.warn('Unable to clear local storage data');
+    }
   }
+
+  return {
+    success: true
+  };
+}
 
   // GET /api/auth/me
   async getCurrentUser() {
@@ -112,9 +226,9 @@ class ApiService {
     return storageService.getUser();
   }
 
-  // PATCH /api/users/profile
+  // PATCH /api/auth/profile
   async updateUserProfile(updates) {
-    const res = await this.request('/users/profile', {
+    const res = await this.request('/auth/profile', {
       method: 'PATCH',
       body: JSON.stringify(updates)
     });
