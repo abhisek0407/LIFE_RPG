@@ -16,7 +16,12 @@ import LoginPage from "./components/LoginPage";
 import RegisterPage from "./components/RegisterPage";
 import { apiService } from "./services/apiService";
 import { storageService } from "./services/storageService";
-import { DOMAINS, applyProgression, getEffectiveOverallLevel, getPlayerTitle } from "./services/rpgEngine";
+import {
+  DOMAINS,
+  applyProgression,
+  getEffectiveOverallLevel,
+  getPlayerTitle,
+} from "./services/rpgEngine";
 import ForgotPasswordPage from "./components/ForgotPasswordPage";
 import ResetPasswordPage from "./components/ResetPasswordPage";
 import ProfileSettings from "./components/ProfileSettings";
@@ -34,7 +39,119 @@ const normalizeQuestForUi = (quest = {}) => ({
       }))
     : [],
 });
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
 
+    this.state = {
+      hasError: false,
+      error: null,
+    };
+  }
+
+  static getDerivedStateFromError(error) {
+    return {
+      hasError: true,
+      error,
+    };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("LifeRPG UI crashed:", error);
+    console.error("Component stack:", errorInfo?.componentStack);
+  }
+
+  handleReload = () => {
+    window.location.reload();
+  };
+
+  handleLogout = () => {
+    try {
+      localStorage.removeItem("lrpg_jwt_token");
+    } catch (error) {
+      console.error("Could not clear token:", error);
+    }
+
+    window.location.reload();
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6">
+          <div className="w-full max-w-md text-center">
+            <div className="text-6xl mb-6">⚔️</div>
+
+            <h1 className="text-2xl font-bold mb-3">
+              LifeRPG encountered an error
+            </h1>
+
+            <p className="text-slate-400 mb-6">
+              Something went wrong while loading your RPG dashboard.
+              Your account data is still safe on the server.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                type="button"
+                onClick={this.handleReload}
+                className="px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold"
+              >
+                Reload
+              </button>
+
+              <button
+                type="button"
+                onClick={this.handleLogout}
+                className="px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold"
+              >
+                Sign out
+              </button>
+            </div>
+
+            {import.meta.env.DEV && this.state.error && (
+              <pre className="mt-6 p-4 text-left text-xs text-red-300 bg-slate-900 rounded-xl overflow-auto">
+                {this.state.error.stack || String(this.state.error)}
+              </pre>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+function normalizeUserForUi(userData) {
+  if (!userData) return null;
+
+  try {
+    const overallLevel = getEffectiveOverallLevel(userData);
+
+    return {
+      ...userData,
+      character: {
+        ...(userData.character || {}),
+        overallLevel,
+        title: getPlayerTitle(overallLevel),
+      },
+    };
+  } catch (error) {
+    console.error("User normalization failed:", error);
+
+    // Keep the app usable even if an older/incomplete user document
+    // is returned from the backend.
+    return {
+      ...userData,
+      character: {
+        ...(userData.character || {}),
+        overallLevel:
+          userData.character?.overallLevel || userData.character?.level || 1,
+        title: userData.character?.title || "Novice Adventurer",
+      },
+    };
+  }
+}
 export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -68,15 +185,7 @@ export default function App() {
         const currentUser = await apiService.getCurrentUser();
 
         if (currentUser) {
-          const normalizedUser = {
-            ...currentUser,
-            character: {
-              ...currentUser.character,
-              overallLevel: getEffectiveOverallLevel(currentUser),
-              title: getPlayerTitle(getEffectiveOverallLevel(currentUser)),
-            },
-          };
-          setUser(normalizedUser);
+          setUser(normalizeUserForUi(currentUser));
         } else {
           apiService.setToken(null);
         }
@@ -98,7 +207,7 @@ export default function App() {
     }
     try {
       localStorage.setItem("lrpg_theme", theme);
-    } catch (e) { }
+    } catch (e) {}
   }, [theme]);
   const handleLogout = async () => {
     try {
@@ -232,7 +341,7 @@ export default function App() {
         xpAmount: xp,
         goldAmount: gold,
       });
-      setUser(optimisticProgression.updatedUser);
+      setUser(normalizeUserForUi(optimisticProgression.updatedUser));
     }
 
     setQuests((prevQuests) =>
@@ -243,7 +352,13 @@ export default function App() {
         const updatedTasks = (quest.microtasks || []).map((m) => {
           const taskKey = m.id ?? m._id;
           return taskKey === normalizedMicrotaskId
-            ? { ...m, id: taskKey, _id: m._id ?? taskKey, isCompleted: true, completedAt: new Date().toISOString() }
+            ? {
+                ...m,
+                id: taskKey,
+                _id: m._id ?? taskKey,
+                isCompleted: true,
+                completedAt: new Date().toISOString(),
+              }
             : m;
         });
 
@@ -270,7 +385,7 @@ export default function App() {
 
     const serverUser = result?.updatedUser || result?.user;
     if (serverUser) {
-      setUser(serverUser);
+      setUser(normalizeUserForUi(serverUser));
     }
 
     if (result?.quest) {
@@ -278,7 +393,8 @@ export default function App() {
       setQuests((prevQuests) =>
         prevQuests.map((quest) => {
           const currentQuestId = quest.id ?? quest._id;
-          const incomingQuestId = normalizedServerQuest.id ?? normalizedServerQuest._id;
+          const incomingQuestId =
+            normalizedServerQuest.id ?? normalizedServerQuest._id;
           return currentQuestId === incomingQuestId
             ? {
                 ...quest,
@@ -333,8 +449,8 @@ export default function App() {
     });
 
     if (result?.updatedUser) {
-      setUser(result.updatedUser);
-    }
+  setUser(normalizeUserForUi(result.updatedUser));
+}
 
     const domainName = DOMAINS[domain]?.name || "XP";
     showFeedback({
@@ -362,17 +478,17 @@ export default function App() {
       prev.map((d) =>
         d.id === daily.id
           ? {
-            ...d,
-            isCompletedToday: true,
-            streakDays: (d.streakDays || 0) + 1,
-          }
+              ...d,
+              isCompletedToday: true,
+              streakDays: (d.streakDays || 0) + 1,
+            }
           : d,
       ),
     );
 
     const result = await apiService.completeDaily(daily.id, user);
     if (result?.updatedUser) {
-      setUser(result.updatedUser);
+      setUser(normalizeUserForUi(result.updatedUser));
     }
 
     const domainName = DOMAINS[daily.domain]?.name || "XP";
@@ -393,39 +509,40 @@ export default function App() {
     if (!dailyId) return;
 
     await apiService.deleteDaily(dailyId);
-    setDailies((prev) => prev.filter((item) => (item.id ?? item._id) !== dailyId));
+    setDailies((prev) =>
+      prev.filter((item) => (item.id ?? item._id) !== dailyId),
+    );
   };
 
   const handleBuyItem = async (item) => {
-  try {
-    const result = await apiService.buyStoreItem(item, user);
+    try {
+      const result = await apiService.buyStoreItem(item, user);
 
-    if (result?.success && result?.updatedUser) {
-      setUser(result.updatedUser);
-      return true;
+      if (result?.success && result?.updatedUser) {
+        setUser(normalizeUserForUi(result.updatedUser));
+        return true;
+      }
+
+      console.error("Store purchase failed:", result);
+
+      alert(
+        result?.error || "Purchase failed. Please check the backend server.",
+      );
+
+      return false;
+    } catch (error) {
+      console.error("Store purchase error:", error);
+      alert("Unable to complete purchase.");
+      return false;
     }
-
-    console.error("Store purchase failed:", result);
-
-    alert(
-      result?.error ||
-        "Purchase failed. Please check the backend server."
-    );
-
-    return false;
-  } catch (error) {
-    console.error("Store purchase error:", error);
-    alert("Unable to complete purchase.");
-    return false;
-  }
-};
+  };
   const handleUseItem = async (item) => {
     const itemId = item.itemId || item._id;
 
     const result = await apiService.useStoreItem(itemId);
 
     if (result?.updatedUser) {
-      setUser(result.updatedUser);
+      setUser(normalizeUserForUi(result.updatedUser));
     }
 
     if (result?.success) {
@@ -438,7 +555,7 @@ export default function App() {
   const handleClaimDailyCheckIn = async () => {
     const result = await apiService.claimStreakCheckin(user);
     if (result?.updatedUser) {
-      setUser(result.updatedUser);
+      setUser(normalizeUserForUi(result.updatedUser));
     }
 
     showFeedback({
@@ -466,7 +583,8 @@ export default function App() {
       return (
         <LoginPage
           onLogin={(loggedInUser) => {
-            setUser(loggedInUser);
+            setUser(normalizeUserForUi(loggedInUser));
+            setAuthPage("login");
           }}
           onSwitchToRegister={() => {
             setAuthPage("register");
@@ -482,7 +600,10 @@ export default function App() {
       return (
         <RegisterPage
           onRegister={(registeredUser) => {
-            setUser(registeredUser);
+            const normalizedUser = normalizeUserForUi(registeredUser);
+
+            setUser(normalizedUser);
+            setAuthPage("login");
           }}
           onSwitchToLogin={() => {
             setAuthPage("login");
@@ -514,7 +635,9 @@ export default function App() {
             setAuthPage("login");
           }}
           onPasswordReset={(resetUser) => {
-            setUser(resetUser);
+            setUser(normalizeUserForUi(resetUser));
+            setResetToken("");
+            setAuthPage("login");
           }}
         />
       );
@@ -601,7 +724,7 @@ export default function App() {
           {activeTab === "profile" && (
             <ProfileSettings
               user={user}
-              onUpdateUser={(updatedUser) => setUser(updatedUser)}
+              onUpdateUser={(updatedUser) => setUser(normalizeUserForUi(updatedUser))}
               onBack={() => setActiveTab("home")}
             />
           )}
