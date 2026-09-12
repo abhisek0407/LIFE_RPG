@@ -113,7 +113,9 @@ function normalizeFeelStuck(parsed) {
     }
 
     const groundingMicrotasks = groundingRaw.slice(0, 4).map((mt, i) => ({
+        id: mt.id || mt._id || `grounding_${i + 1}_${Date.now()}`,
         title: typeof mt.title === "string" && mt.title.trim() ? mt.title.trim() : `Grounding step ${i + 1}`,
+        domain: ["health", "mental", "skill"].includes(mt.domain) ? mt.domain : "mental",
         xpReward: Number.isFinite(mt.xpReward) && mt.xpReward > 0 ? Math.round(mt.xpReward) : 10,
         goldReward: Number.isFinite(mt.goldReward) && mt.goldReward >= 0 ? Math.round(mt.goldReward) : 0,
     }));
@@ -161,10 +163,13 @@ function decomposeWithRules(description, domain, motivation) {
     };
 
     const steps = templates[motivation] || templates.medium;
-    const microtasks = steps.map((step) => ({
+    const microtasks = steps.map((step, i) => ({
+        id: `mt_dec_${i + 1}_${Date.now()}`,
         title: `${step.suffix} ${description}`,
+        order: i + 1,
         xpReward: step.xpReward,
         goldReward: Math.round(step.xpReward * 0.3),
+        isCompleted: false,
     }));
 
     return {
@@ -175,6 +180,7 @@ function decomposeWithRules(description, domain, motivation) {
 }
 
 function feelStuckFallback(domain) {
+    const activeDomain = ["health", "mental", "skill"].includes(domain) ? domain : "mental";
     return {
         breathingExercise: {
             name: "Box Breathing",
@@ -186,9 +192,9 @@ function feelStuckFallback(domain) {
             ],
         },
         groundingMicrotasks: [
-            { title: "Name 3 things you can see around you", xpReward: 10, goldReward: 0 },
-            { title: "Stand up and stretch for 30 seconds", xpReward: 10, goldReward: 0 },
-            { title: "Drink a glass of water", xpReward: 10, goldReward: 0 },
+            { id: "grounding_1", domain: activeDomain, title: "Name 3 things you can see around you", xpReward: 10, goldReward: 0 },
+            { id: "grounding_2", domain: "health", title: "Stand up and stretch for 30 seconds", xpReward: 10, goldReward: 0 },
+            { id: "grounding_3", domain: "health", title: "Drink a glass of water", xpReward: 10, goldReward: 0 },
         ],
         encouragement: domain
             ? `Feeling stuck on something in your ${domain} domain is normal — a tiny reset can help.`
@@ -200,16 +206,16 @@ function feelStuckFallback(domain) {
 // body: { description, domain, motivationLevel? }
 export async function decomposeTask(req, res) {
     try {
-        const { description, domain, motivationLevel } = req.body;
-
-        if (!description?.trim()) {
+        const rawDescription = req.body.description || req.body.task;
+        if (!rawDescription?.trim()) {
             return res.status(400).json({ error: "description is required" });
         }
-        if (!["health", "mental", "skill"].includes(domain)) {
+        if (req.body.domain && !["health", "mental", "skill"].includes(req.body.domain)) {
             return res.status(400).json({ error: "domain must be health, mental, or skill" });
         }
-        const motivation = ["low", "medium", "high"].includes(motivationLevel) ? motivationLevel : "medium";
-        const trimmedDescription = description.trim();
+        const domain = req.body.domain || "mental";
+        const motivation = ["low", "medium", "high"].includes(req.body.motivationLevel) ? req.body.motivationLevel : "medium";
+        const trimmedDescription = rawDescription.trim();
 
         let result;
         let source;

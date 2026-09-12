@@ -105,7 +105,15 @@ export async function buyItem(req, res) {
             },
         });
 
-        return res.status(200).json({ item, appliedImmediately, user });
+        return res.status(200).json({
+            success: true,
+            item,
+            purchasedItem: item,
+            remainingGold: user.character.gold,
+            appliedImmediately,
+            updatedUser: user,
+            user,
+        });
     } catch (err) {
         console.error("buyItem error:", err);
         return res.status(500).json({ error: "Failed to purchase item" });

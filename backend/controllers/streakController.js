@@ -1,4 +1,5 @@
 import ActivityLog from "../models/activityLogSchema.js";
+import User from "../models/userSchema.js";
 
 // ── GET /api/streaks ───────────────────────────────────────────
 // Returns the user's current streak state plus a 30-day activity
@@ -48,7 +49,16 @@ export async function getStreaks(req, res) {
             });
         }
 
+        const currentStreak = req.user.streak?.currentStreak || 1;
+        const longestStreak = req.user.streak?.longestStreak || 1;
+        const multiplier = User.streakMultiplier ? User.streakMultiplier(currentStreak) : (1.0 + Math.min(currentStreak * 0.05, 0.5));
+        const freezesAvailable = req.user.streak?.streakFreezesAvailable || 0;
+
         return res.status(200).json({
+            currentStreak,
+            longestStreak,
+            multiplier,
+            freezesAvailable,
             streak: req.user.streak,
             heatmap,
         });
