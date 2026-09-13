@@ -533,15 +533,33 @@ class ApiService {
     return storageService.getStoreItems();
   }
 
+  // GET /api/store/inventory
+  async getInventory() {
+    const res = await this.request("/store/inventory");
+    if (res?.inventory) {
+      return res.inventory;
+    }
+
+    const savedUser = storageService.getUser();
+    return savedUser?.inventory || [];
+  }
+
   // POST /api/store/buy
   async buyStoreItem(item, user) {
+    const itemId = item?.id ?? item?._id ?? item?.itemId;
     const res = await this.request("/store/buy", {
       method: "POST",
-      body: JSON.stringify({ itemId: item.id }),
+      body: JSON.stringify({ itemId }),
     });
 
     if (res?.success) {
-      return res;
+      const serverUser = res.user || res.updatedUser || user;
+      return {
+        success: true,
+        user: serverUser,
+        updatedUser: serverUser,
+        remainingGold: serverUser?.character?.gold ?? user?.character?.gold ?? 0,
+      };
     }
 
     // Local fallback
@@ -553,14 +571,14 @@ class ApiService {
     updatedUser.character.gold = currentGold - item.costGold;
 
     const existingIndex = updatedUser.inventory.findIndex(
-      (inv) => inv.itemId === item.id,
+      (inv) => (inv.itemId ?? inv.id) === itemId,
     );
     if (existingIndex >= 0) {
       updatedUser.inventory[existingIndex].quantity =
         (updatedUser.inventory[existingIndex].quantity || 1) + 1;
     } else {
       updatedUser.inventory.push({
-        itemId: item.id,
+        itemId,
         name: item.name,
         type: item.type,
         quantity: 1,
@@ -579,6 +597,50 @@ class ApiService {
       success: true,
       remainingGold: updatedUser.character.gold,
       updatedUser,
+      user: updatedUser,
+    };
+  }
+
+  // POST /api/store/use/:itemId
+  async useStoreItem(itemId) {
+    const res = await this.request(`/store/use/${encodeURIComponent(itemId)}`, {
+      method: "POST",
+    });
+
+    if (res?.success || res?.user || res?.message) {
+      return {
+        success: true,
+        message: res?.message || "Item used successfully",
+        updatedUser: res?.user || null,
+        user: res?.user || null,
+      };
+    }
+
+    const user = storageService.getUser();
+    const inventory = Array.isArray(user?.inventory) ? user.inventory : [];
+    const entry = inventory.find((inv) => (inv.itemId ?? inv.id) === itemId);
+
+    if (!entry) {
+      return { success: false, error: "Item not found in inventory" };
+    }
+
+    const nextQuantity = Math.max((entry.quantity || 1) - 1, 0);
+    const nextInventory = inventory
+      .filter((inv) => (inv.itemId ?? inv.id) !== itemId)
+      .concat(
+        nextQuantity > 0
+          ? [{ ...entry, quantity: nextQuantity, itemId: entry.itemId ?? entry.id }]
+          : [],
+      );
+
+    const updatedUser = { ...user, inventory: nextInventory };
+    storageService.saveUser(updatedUser);
+
+    return {
+      success: true,
+      message: `Used ${entry.name || "item"}`,
+      updatedUser,
+      user: updatedUser,
     };
   }
 

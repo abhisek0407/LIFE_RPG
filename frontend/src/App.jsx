@@ -584,9 +584,10 @@ export default function App() {
   const handleBuyItem = async (item) => {
     try {
       const result = await apiService.buyStoreItem(item, user);
+      const updatedUser = result?.updatedUser || result?.user || null;
 
-      if (result?.success && result?.updatedUser) {
-        setUser(normalizeUserForUi(result.updatedUser));
+      if (result?.success && updatedUser) {
+        setUser(normalizeUserForUi(updatedUser));
         return true;
       }
 
@@ -789,11 +790,7 @@ export default function App() {
           )}
 
           {activeTab === "store" && (
-            <StoreView
-              user={user}
-              storeItems={storeItems}
-              onBuyItem={handleBuyItem}
-            />
+            <StoreView user={user} storeItems={storeItems} onBuyItem={handleBuyItem} onUseItem={handleUseItem} />
           )}
           {activeTab === "profile" && (
             <ProfileSettings
