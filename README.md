@@ -21,7 +21,12 @@
 </div>
 
 ---
+## 🎬 Demo Video
 
+[![Watch the demo](https://img.youtube.com/vi/fgUQLDtN_XM/maxresdefault.jpg)](https://youtu.be/fgUQLDtN_XM)
+
+> Click the thumbnail above to watch the full walkthrough on YouTube.
+> 
 ## 🧭 Table of Contents
 
 - [Why Life RPG](#-why-life-rpg)
