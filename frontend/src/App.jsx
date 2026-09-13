@@ -179,6 +179,15 @@ export default function App() {
         const token = apiService.getToken();
 
         if (!token) {
+          try {
+            const savedUser = JSON.parse(localStorage.getItem("lrpg_user_profile") || "null");
+            if (savedUser) {
+              setUser(normalizeUserForUi(savedUser));
+            }
+          } catch {
+            // ignore stale local storage data
+          }
+
           setAuthLoading(false);
           return;
         }
@@ -188,11 +197,29 @@ export default function App() {
         if (currentUser) {
           setUser(normalizeUserForUi(currentUser));
         } else {
-          apiService.setToken(null);
+          try {
+            const savedUser = JSON.parse(localStorage.getItem("lrpg_user_profile") || "null");
+            if (savedUser) {
+              setUser(normalizeUserForUi(savedUser));
+            } else {
+              apiService.setToken(null);
+            }
+          } catch {
+            apiService.setToken(null);
+          }
         }
       } catch (err) {
         console.error("Session restore failed:", err);
-        apiService.setToken(null);
+        try {
+          const savedUser = JSON.parse(localStorage.getItem("lrpg_user_profile") || "null");
+          if (savedUser) {
+            setUser(normalizeUserForUi(savedUser));
+          } else {
+            apiService.setToken(null);
+          }
+        } catch {
+          apiService.setToken(null);
+        }
       } finally {
         setAuthLoading(false);
       }
@@ -247,7 +274,7 @@ export default function App() {
     async function loadData() {
       try {
         const [questsData, dailiesData, storeData] = await Promise.all([
-          apiService.getQuests(),
+          apiService.getQuests("all"),
           apiService.getDailies(),
           apiService.getStoreItems(),
         ]);
