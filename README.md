@@ -25,6 +25,7 @@
 ## 🧭 Table of Contents
 
 - [Why Life RPG](#-why-life-rpg)
+- [Screenshots](#-screenshots)
 - [Features](#-features)
 - [Tech Stack](#-tech-stack)
 - [Architecture](#-architecture)
@@ -47,6 +48,17 @@ Traditional productivity apps feel like chores because the real-world payoff of 
 - 🧩 **Micro-Steps Beat Paralysis** — an AI Quest Engine decomposes any goal into 4–6 concrete steps, tuned to your stated motivation level (Low / Medium / High).
 - 🧘 **"Feel Stuck" Emergency Chamber** — one tap gives you box-breathing (4-4-4-4) plus 3 tiny grounding actions to unfreeze executive dysfunction.
 - 🗣️ **Talk instead of type** — speak your task out loud in *any language* and the AI titles, categorizes, and decomposes it for you.
+
+---
+
+## 📸 Screenshots
+
+| | |
+|:---:|:---:|
+| **Active Quest Log** | **Home — Decompose a Goal** |
+| ![Active Quest Log](screenshots/active-quests.png) | ![Home](screenshots/home.png) |
+| **Daily Ritual Quests** | **Store & Armory** |
+| ![Daily Quests](screenshots/daily-quests.png) | ![Store & Armory](screenshots/store.png) |
 
 ---
 
