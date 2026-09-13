@@ -75,8 +75,20 @@ const inventoryItemSchema = new Schema(
 
         type: {
             type: String,
-            enum: ["potion", "badge", "theme", "relic", "freeze"],
+            enum: ["power", "potion", "badge", "theme", "relic", "freeze", "boost", "consumable"],
             required: true,
+        },
+
+        school: {
+            type: String,
+            enum: ["fire", "water", "earth", "air", "arcane", "shadow", "holy", "nature", "mind", "time"],
+            default: "arcane",
+        },
+
+        rarity: {
+            type: String,
+            enum: ["common", "rare", "epic", "legendary"],
+            default: "common",
         },
 
         quantity: {

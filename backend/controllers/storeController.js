@@ -7,7 +7,7 @@ export async function getStoreItems(req, res) {
     const filter = {};
     if (req.query.type) {
       if (
-        !["potion", "freeze", "theme", "badge", "relic"].includes(
+        !["power", "potion", "freeze", "theme", "badge", "relic", "boost", "consumable"].includes(
           req.query.type,
         )
       ) {
@@ -39,7 +39,7 @@ export async function buyItem(req, res) {
       return res.status(400).json({ error: "itemId is required" });
     }
 
-    const item = await StoreItem.findById(itemId);
+    const item = await StoreItem.findOne({ _id: itemId });
     if (!item) {
       return res.status(404).json({ error: "Store item not found" });
     }
@@ -51,14 +51,9 @@ export async function buyItem(req, res) {
       return res.status(400).json({ error: "Insufficient gold or gems" });
     }
 
-    // ── Deduct currency ──
     user.character.gold -= item.costGold;
     user.character.gems -= costGems;
 
-    // ── Apply / stow the effect ──
-    // streak_freeze, theme_unlock and badge_grant are applied immediately
-    // (they shouldn't just sit inertly in inventory). Everything else
-    // (potions, relics) is added to inventory to be used/kept later.
     let appliedImmediately = false;
 
     if (item.type === "freeze") {
@@ -67,14 +62,32 @@ export async function buyItem(req, res) {
 
       user.streak.streakFreezesAvailable += amount;
       appliedImmediately = true;
+    } else if (item.type === "power") {
+      const existing = user.inventory.find(
+        (inv) => inv.itemId === String(item._id) || inv.itemId === itemId,
+      );
+
+      if (!existing) {
+        user.inventory.push({
+          itemId: String(item._id),
+          name: item.name,
+          type: "power",
+          school: item.school || "arcane",
+          rarity: item.rarity || "common",
+          quantity: 1,
+          equipped: false,
+        });
+      }
     } else {
-      const existing = user.inventory.find((inv) => inv.itemId === item._id);
+      const existing = user.inventory.find(
+        (inv) => inv.itemId === String(item._id) || inv.itemId === itemId,
+      );
 
       if (existing) {
         existing.quantity += 1;
       } else {
         user.inventory.push({
-          itemId: item._id,
+          itemId: String(item._id),
           name: item.name,
           type: item.type,
           quantity: 1,
@@ -133,16 +146,18 @@ export async function useItem(req, res) {
     const { itemId } = req.params;
     const user = req.user;
 
-    const invEntry = user.inventory.find((inv) => inv.itemId === itemId);
+    const invEntry = user.inventory.find(
+      (inv) => inv.itemId === itemId || inv.itemId === String(itemId),
+    );
     if (!invEntry || invEntry.quantity <= 0) {
       return res.status(404).json({ error: "Item not found in inventory" });
     }
 
-    const storeItem = await StoreItem.findById(itemId);
+    const storeItem = await StoreItem.findOne({ _id: itemId });
     if (!storeItem) {
       return res.status(404).json({ error: "Store item no longer exists" });
     }
-    if (!["potion", "relic"].includes(storeItem.type)) {
+    if (!["potion", "relic", "boost", "consumable"].includes(storeItem.type)) {
       return res
         .status(400)
         .json({ error: "This item cannot be used — it's a permanent unlock" });

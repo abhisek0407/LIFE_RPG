@@ -17,22 +17,29 @@ const effectSchema = new Schema(
 
 const storeItemSchema = new Schema(
     {
-        _id: { type: String, required: true }, // custom string id like "potion_focus"
+        _id: { type: String, required: true }, // custom string id like "fire_emberbrand"
         name: { type: String, required: true, unique: true },
         description: { type: String, required: true },
         type: {
             type: String,
-            enum: ["potion", "freeze", "theme", "badge", "relic"],
+            enum: ["power", "potion", "freeze", "theme", "badge", "relic", "boost", "consumable"],
             required: true,
+            default: "power",
+        },
+        school: {
+            type: String,
+            enum: ["fire", "water", "earth", "air", "arcane", "shadow", "holy", "nature", "mind", "time"],
+            default: "arcane",
         },
         costGold: { type: Number, required: true },
         costGems: { type: Number, default: 0 },
-        icon: { type: String, required: true }, // lucide icon name
+        icon: { type: String, required: true },
         rarity: {
             type: String,
             enum: ["common", "rare", "epic", "legendary"],
             default: "common",
         },
+        effectText: { type: String, default: "" },
         effect: { type: effectSchema, default: null },
     },
     { _id: false, timestamps: true }

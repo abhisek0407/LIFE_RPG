@@ -179,6 +179,15 @@ export default function App() {
         const token = apiService.getToken();
 
         if (!token) {
+          try {
+            const savedUser = JSON.parse(localStorage.getItem("lrpg_user_profile") || "null");
+            if (savedUser) {
+              setUser(normalizeUserForUi(savedUser));
+            }
+          } catch {
+            // ignore stale local storage data
+          }
+
           setAuthLoading(false);
           return;
         }
@@ -188,11 +197,29 @@ export default function App() {
         if (currentUser) {
           setUser(normalizeUserForUi(currentUser));
         } else {
-          apiService.setToken(null);
+          try {
+            const savedUser = JSON.parse(localStorage.getItem("lrpg_user_profile") || "null");
+            if (savedUser) {
+              setUser(normalizeUserForUi(savedUser));
+            } else {
+              apiService.setToken(null);
+            }
+          } catch {
+            apiService.setToken(null);
+          }
         }
       } catch (err) {
         console.error("Session restore failed:", err);
-        apiService.setToken(null);
+        try {
+          const savedUser = JSON.parse(localStorage.getItem("lrpg_user_profile") || "null");
+          if (savedUser) {
+            setUser(normalizeUserForUi(savedUser));
+          } else {
+            apiService.setToken(null);
+          }
+        } catch {
+          apiService.setToken(null);
+        }
       } finally {
         setAuthLoading(false);
       }
@@ -247,7 +274,7 @@ export default function App() {
     async function loadData() {
       try {
         const [questsData, dailiesData, storeData] = await Promise.all([
-          apiService.getQuests(),
+          apiService.getQuests("all"),
           apiService.getDailies(),
           apiService.getStoreItems(),
         ]);
@@ -557,9 +584,10 @@ export default function App() {
   const handleBuyItem = async (item) => {
     try {
       const result = await apiService.buyStoreItem(item, user);
+      const updatedUser = result?.updatedUser || result?.user || null;
 
-      if (result?.success && result?.updatedUser) {
-        setUser(normalizeUserForUi(result.updatedUser));
+      if (result?.success && updatedUser) {
+        setUser(normalizeUserForUi(updatedUser));
         return true;
       }
 
@@ -762,11 +790,7 @@ export default function App() {
           )}
 
           {activeTab === "store" && (
-            <StoreView
-              user={user}
-              storeItems={storeItems}
-              onBuyItem={handleBuyItem}
-            />
+            <StoreView user={user} storeItems={storeItems} onBuyItem={handleBuyItem} onUseItem={handleUseItem} />
           )}
           {activeTab === "profile" && (
             <ProfileSettings
